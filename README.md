@@ -6,8 +6,10 @@ The host (desktop/taskbar/window manager/state) is static React code, while each
 ## What it includes
 
 - Desktop shell with icons, window manager, and taskbar.
+- Built-in **Terminal** system app backed by the host Node server shell process.
 - Host API bridge for generated apps (`openApp`, `readFile`, `writeFile`, `requestUpdate`, `listFiles`).
 - Thin Node orchestrator for session/window lifecycle, prompt context, revision history, rollback, and event streaming.
+- Terminal API endpoints for start/input/stop with per-window stream events over SSE.
 - Vite virtual module plugin: generated window code is kept in memory and loaded from `/@window-app/<session>/<window>/entry.tsx`.
 - Update loop:
   1. user opens app → window appears in loading state
