@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
-import { openWindow, createSession, requestWindowUpdate } from './api/client';
+import {
+  closeWindow,
+  createSession,
+  openWindow,
+  requestWindowUpdate,
+  sendTerminalInput,
+  startTerminal,
+  stopTerminal
+} from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
 import { DesktopIcons } from './components/DesktopIcons';
 import { FilePanel } from './components/FilePanel';
@@ -12,8 +20,15 @@ import type {
   HostBridge,
   HostFileEntry,
   ServerWindowEvent,
+  TerminalStateSnapshot,
   UpdateStrategy
 } from './types';
+
+type TerminalServerEvent = Extract<
+  ServerWindowEvent,
+  { type: 'terminal-status' | 'terminal-output' | 'terminal-exit' }
+>;
+type WindowServerEvent = Exclude<ServerWindowEvent, TerminalServerEvent>;
 
 interface AppState {
   sessionId?: string;
@@ -22,6 +37,7 @@ interface AppState {
   focusedWindowId?: string;
   nextZIndex: number;
   files: Record<string, HostFileEntry>;
+  terminals: Record<string, TerminalStateSnapshot>;
 }
 
 type AppAction =
@@ -62,10 +78,13 @@ type AppAction =
       content: string;
     };
 
+const MAX_TERMINAL_BUFFER_CHARS = 40_000;
+
 const initialState: AppState = {
   windows: [],
   nextZIndex: 10,
-  files: {}
+  files: {},
+  terminals: {}
 };
 
 function maximizeZIndex(state: AppState, windowId: string): AppState {
@@ -90,7 +109,66 @@ function updateWindow(
   return windows.map((windowItem) => (windowItem.windowId === windowId ? updater(windowItem) : windowItem));
 }
 
-function applyServerEvent(state: AppState, event: ServerWindowEvent): AppState {
+function normalizeTerminalBuffer(buffer: string) {
+  if (buffer.length <= MAX_TERMINAL_BUFFER_CHARS) {
+    return buffer;
+  }
+  return buffer.slice(buffer.length - MAX_TERMINAL_BUFFER_CHARS);
+}
+
+function applyTerminalEvent(state: AppState, event: TerminalServerEvent): AppState {
+  const current: TerminalStateSnapshot = state.terminals[event.windowId] ?? {
+    status: 'idle',
+    buffer: ''
+  };
+
+  if (event.type === 'terminal-output') {
+    const nextBuffer = normalizeTerminalBuffer(`${current.buffer}${event.chunk ?? ''}`);
+    return {
+      ...state,
+      terminals: {
+        ...state.terminals,
+        [event.windowId]: {
+          ...current,
+          buffer: nextBuffer
+        }
+      }
+    };
+  }
+
+  if (event.type === 'terminal-exit') {
+    const exitMessage = event.signal
+      ? `\n\n[Terminal exited via signal ${event.signal}]`
+      : `\n\n[Terminal exited with code ${String(event.code ?? 'unknown')}]`;
+    return {
+      ...state,
+      terminals: {
+        ...state.terminals,
+        [event.windowId]: {
+          ...current,
+          status: 'closed',
+          buffer: normalizeTerminalBuffer(`${current.buffer}${exitMessage}`)
+        }
+      }
+    };
+  }
+
+  return {
+    ...state,
+    terminals: {
+      ...state.terminals,
+      [event.windowId]: {
+        ...current,
+        status: event.status === 'error' ? 'error' : event.status ?? 'running',
+        shell: event.shell ?? current.shell,
+        cwd: event.cwd ?? current.cwd,
+        message: event.message
+      }
+    }
+  };
+}
+
+function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
   if (event.type === 'window-remount') {
     return {
       ...state,
@@ -119,6 +197,13 @@ function applyServerEvent(state: AppState, event: ServerWindowEvent): AppState {
       minimized: status === 'ready' ? false : windowItem.minimized
     }))
   };
+}
+
+function applyServerEvent(state: AppState, event: ServerWindowEvent): AppState {
+  if (event.type === 'terminal-status' || event.type === 'terminal-output' || event.type === 'terminal-exit') {
+    return applyTerminalEvent(state, event);
+  }
+  return applyWindowEvent(state, event);
 }
 
 function reducer(state: AppState, action: AppAction): AppState {
@@ -152,18 +237,32 @@ function reducer(state: AppState, action: AppAction): AppState {
         ...state,
         focusedWindowId: action.windowId,
         nextZIndex: nextZ,
-        windows: [...state.windows, nextWindow]
+        windows: [...state.windows, nextWindow],
+        terminals:
+          action.appId === 'terminal'
+            ? {
+                ...state.terminals,
+                [action.windowId]: {
+                  status: 'idle',
+                  buffer: ''
+                }
+              }
+            : state.terminals
       };
     }
     case 'window-focus':
       return maximizeZIndex(state, action.windowId);
-    case 'window-close':
+    case 'window-close': {
+      const nextTerminals = { ...state.terminals };
+      delete nextTerminals[action.windowId];
       return {
         ...state,
         windows: state.windows.filter((windowItem) => windowItem.windowId !== action.windowId),
+        terminals: nextTerminals,
         focusedWindowId:
           state.focusedWindowId === action.windowId ? undefined : state.focusedWindowId
       };
+    }
     case 'window-toggle-minimize':
       return {
         ...state,
@@ -204,10 +303,12 @@ function randomWindowId() {
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const filesRef = useRef(state.files);
+  const sessionRef = useRef(state.sessionId);
 
   useEffect(() => {
     filesRef.current = state.files;
-  }, [state.files]);
+    sessionRef.current = state.sessionId;
+  }, [state.files, state.sessionId]);
 
   useEffect(() => {
     let active = true;
@@ -250,7 +351,10 @@ export default function App() {
       'window-ready',
       'window-updated',
       'window-error',
-      'window-remount'
+      'window-remount',
+      'terminal-status',
+      'terminal-output',
+      'terminal-exit'
     ];
     for (const type of eventTypes) {
       events.addEventListener(type, listener as EventListener);
@@ -358,7 +462,9 @@ export default function App() {
     return <div className="booting-shell">Unable to boot desktop: {state.bootError}</div>;
   }
 
-  if (!state.sessionId) {
+  const activeSessionId = state.sessionId;
+
+  if (!activeSessionId) {
     return <div className="booting-shell">Aionios is booting...</div>;
   }
 
@@ -373,7 +479,7 @@ export default function App() {
             }
 
             const hostBridge: HostBridge = {
-              sessionId: state.sessionId!,
+              sessionId: activeSessionId,
               windowId: windowItem.windowId,
               appId: windowItem.appId,
               openApp: async (appId) => {
@@ -390,7 +496,51 @@ export default function App() {
               requestUpdate: async (instruction) => {
                 await requestUpdateForWindow(windowItem.windowId, instruction);
               },
-              listFiles: async () => Object.values(filesRef.current)
+              listFiles: async () => Object.values(filesRef.current),
+              terminal: {
+                start: async () => {
+                  const currentSessionId = sessionRef.current;
+                  if (!currentSessionId) {
+                    return;
+                  }
+                  const metadata = await startTerminal({
+                    sessionId: currentSessionId,
+                    windowId: windowItem.windowId
+                  });
+                  dispatch({
+                    type: 'window-server-event',
+                    event: {
+                      type: 'terminal-status',
+                      sessionId: currentSessionId,
+                      windowId: windowItem.windowId,
+                      status: 'running',
+                      shell: metadata.shell,
+                      cwd: metadata.cwd
+                    }
+                  });
+                },
+                sendInput: async (input) => {
+                  const currentSessionId = sessionRef.current;
+                  if (!currentSessionId) {
+                    return;
+                  }
+                  await sendTerminalInput({
+                    sessionId: currentSessionId,
+                    windowId: windowItem.windowId,
+                    payload: input
+                  });
+                },
+                stop: async () => {
+                  const currentSessionId = sessionRef.current;
+                  if (!currentSessionId) {
+                    return;
+                  }
+                  await stopTerminal({
+                    sessionId: currentSessionId,
+                    windowId: windowItem.windowId
+                  });
+                }
+              }
             };
 
             return (
@@ -405,14 +555,22 @@ export default function App() {
                     windowId: windowItem.windowId
                   })
                 }
-                onClose={() =>
+                onClose={() => {
                   dispatch({
                     type: 'window-close',
                     windowId: windowItem.windowId
-                  })
-                }
+                  });
+                  void closeWindow({
+                    sessionId: activeSessionId,
+                    windowId: windowItem.windowId
+                  });
+                }}
               >
-                <WindowRuntime windowItem={windowItem} hostBridge={hostBridge} />
+                <WindowRuntime
+                  windowItem={windowItem}
+                  hostBridge={hostBridge}
+                  terminalState={state.terminals[windowItem.windowId]}
+                />
               </WindowFrame>
             );
           })}

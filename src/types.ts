@@ -7,6 +7,7 @@ export interface AppDefinition {
   title: string;
   icon: string;
   hint: string;
+  kind: 'system' | 'llm';
 }
 
 export interface DesktopWindow {
@@ -33,6 +34,21 @@ export interface WindowModuleState {
   title: string;
   revision: number;
   status: ClientWindowStatus;
+  terminal?: TerminalStateSnapshot;
+}
+
+export interface TerminalStateSnapshot {
+  status: 'idle' | 'starting' | 'running' | 'closed' | 'error';
+  buffer: string;
+  shell?: string;
+  cwd?: string;
+  message?: string;
+}
+
+export interface TerminalHostBridge {
+  start: () => Promise<void>;
+  sendInput: (input: string) => Promise<void>;
+  stop: () => Promise<void>;
 }
 
 export interface HostBridge {
@@ -44,6 +60,7 @@ export interface HostBridge {
   writeFile: (path: string, content: string) => Promise<void>;
   requestUpdate: (instruction: string) => Promise<void>;
   listFiles: () => Promise<HostFileEntry[]>;
+  terminal: TerminalHostBridge;
 }
 
 export interface WindowModuleProps {
@@ -66,10 +83,13 @@ export type ServerEventType =
   | 'window-ready'
   | 'window-updated'
   | 'window-error'
-  | 'window-remount';
+  | 'window-remount'
+  | 'terminal-status'
+  | 'terminal-output'
+  | 'terminal-exit';
 
-export interface ServerWindowEvent {
-  type: ServerEventType;
+export interface ServerWindowLifecycleEvent {
+  type: Exclude<ServerEventType, 'terminal-status' | 'terminal-output' | 'terminal-exit'>;
   sessionId: string;
   windowId: string;
   appId?: string;
@@ -79,3 +99,35 @@ export interface ServerWindowEvent {
   strategy?: UpdateStrategy;
   error?: string;
 }
+
+export interface ServerTerminalStatusEvent {
+  type: 'terminal-status';
+  sessionId: string;
+  windowId: string;
+  status: TerminalStateSnapshot['status'];
+  shell?: string;
+  cwd?: string;
+  message?: string;
+}
+
+export interface ServerTerminalOutputEvent {
+  type: 'terminal-output';
+  sessionId: string;
+  windowId: string;
+  stream: 'stdout' | 'stderr';
+  chunk: string;
+}
+
+export interface ServerTerminalExitEvent {
+  type: 'terminal-exit';
+  sessionId: string;
+  windowId: string;
+  code: number | null;
+  signal: string | null;
+}
+
+export type ServerWindowEvent =
+  | ServerWindowLifecycleEvent
+  | ServerTerminalStatusEvent
+  | ServerTerminalOutputEvent
+  | ServerTerminalExitEvent;

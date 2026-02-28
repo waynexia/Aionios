@@ -67,3 +67,47 @@ export async function rollbackWindow(input: {
     }
   );
 }
+
+export async function closeWindow(input: { sessionId: string; windowId: string }) {
+  const response = await fetch(`/api/sessions/${input.sessionId}/windows/${input.windowId}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok && response.status !== 404) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+}
+
+export async function startTerminal(input: { sessionId: string; windowId: string }) {
+  return requestJson<{ shell: string; cwd: string; status: 'running' }>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/terminal/start`,
+    {
+      method: 'POST'
+    }
+  );
+}
+
+export async function sendTerminalInput(input: {
+  sessionId: string;
+  windowId: string;
+  payload: string;
+}) {
+  return requestJson<{ ok: true }>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/terminal/input`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        input: input.payload
+      })
+    }
+  );
+}
+
+export async function stopTerminal(input: { sessionId: string; windowId: string }) {
+  return requestJson<{ closed: boolean }>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/terminal/stop`,
+    {
+      method: 'POST'
+    }
+  );
+}

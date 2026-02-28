@@ -9,19 +9,25 @@ import {
   useState
 } from 'react';
 import { getWindowModuleId } from '../runtime/module-id';
-import type { DesktopWindow, HostBridge, WindowModuleProps } from '../types';
+import type {
+  DesktopWindow,
+  HostBridge,
+  TerminalStateSnapshot,
+  WindowModuleProps
+} from '../types';
 import { ErrorBoundary } from './ErrorBoundary';
 
 interface WindowRuntimeProps {
   windowItem: DesktopWindow;
   hostBridge: HostBridge;
+  terminalState?: TerminalStateSnapshot;
 }
 
 function RuntimeFallback({ children }: PropsWithChildren): ReactNode {
   return <div className="window-runtime__status">{children}</div>;
 }
 
-export function WindowRuntime({ windowItem, hostBridge }: WindowRuntimeProps) {
+export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowRuntimeProps) {
   const [moduleComponent, setModuleComponent] = useState<ComponentType<WindowModuleProps> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadedRevisionRef = useRef(0);
@@ -106,7 +112,8 @@ export function WindowRuntime({ windowItem, hostBridge }: WindowRuntimeProps) {
           windowState={{
             title: windowItem.title,
             revision: windowItem.revision,
-            status: windowItem.status
+            status: windowItem.status,
+            terminal: terminalState
           }}
         />
       </Suspense>

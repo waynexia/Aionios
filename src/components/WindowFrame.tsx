@@ -22,6 +22,9 @@ export function WindowFrame({
     <article
       className={`window-frame ${focused ? 'window-frame--focused' : ''}`}
       style={{ zIndex: windowItem.zIndex }}
+      data-session-id={windowItem.sessionId}
+      data-window-id={windowItem.windowId}
+      data-app-id={windowItem.appId}
       onMouseDown={onFocus}
     >
       <header className="window-frame__header">
