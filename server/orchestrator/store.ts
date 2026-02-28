@@ -65,6 +65,18 @@ export class SessionStore {
     return session.windows.get(windowId);
   }
 
+  deleteWindow(sessionId: string, windowId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+    const removed = session.windows.delete(windowId);
+    if (session.windows.size === 0) {
+      this.sessions.delete(sessionId);
+    }
+    return removed;
+  }
+
   listWindows(sessionId: string): WindowSnapshot[] {
     const session = this.sessions.get(sessionId);
     if (!session) {

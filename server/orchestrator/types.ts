@@ -83,6 +83,38 @@ export interface WindowEvent {
   error?: string;
 }
 
+export interface TerminalStatusEvent {
+  type: 'terminal-status';
+  sessionId: string;
+  windowId: string;
+  status: 'starting' | 'running' | 'closed' | 'error';
+  shell?: string;
+  cwd?: string;
+  message?: string;
+}
+
+export interface TerminalOutputEvent {
+  type: 'terminal-output';
+  sessionId: string;
+  windowId: string;
+  stream: 'stdout' | 'stderr';
+  chunk: string;
+}
+
+export interface TerminalExitEvent {
+  type: 'terminal-exit';
+  sessionId: string;
+  windowId: string;
+  code: number | null;
+  signal: NodeJS.Signals | null;
+}
+
+export type SessionEvent =
+  | WindowEvent
+  | TerminalStatusEvent
+  | TerminalOutputEvent
+  | TerminalExitEvent;
+
 export interface WindowSnapshot {
   sessionId: string;
   windowId: string;

@@ -1,0 +1,213 @@
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import os from 'node:os';
+import type {
+  TerminalExitEvent,
+  TerminalOutputEvent,
+  TerminalStatusEvent
+} from '../orchestrator/types';
+
+interface TerminalSession {
+  key: string;
+  sessionId: string;
+  windowId: string;
+  shell: string;
+  cwd: string;
+  process: ChildProcessWithoutNullStreams;
+}
+
+interface TerminalSessionMetadata {
+  shell: string;
+  cwd: string;
+  status: 'running';
+}
+
+function getDefaultShell() {
+  const configured = process.env.AIONIOS_TERMINAL_SHELL;
+  if (configured) {
+    return configured;
+  }
+
+  if (process.platform === 'win32') {
+    return process.env.ComSpec ?? 'cmd.exe';
+  }
+
+  const candidates = ['/bin/bash', '/usr/bin/bash', '/bin/sh'];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return process.env.SHELL ?? 'sh';
+}
+
+function buildSessionKey(sessionId: string, windowId: string) {
+  return `${sessionId}:${windowId}`;
+}
+
+export class TerminalManager {
+  private readonly sessions = new Map<string, TerminalSession>();
+
+  constructor(
+    private readonly publish: (
+      event: TerminalStatusEvent | TerminalOutputEvent | TerminalExitEvent
+    ) => void
+  ) {}
+
+  start(sessionId: string, windowId: string): TerminalSessionMetadata {
+    const key = buildSessionKey(sessionId, windowId);
+    const existing = this.sessions.get(key);
+    if (existing && !existing.process.killed) {
+      return {
+        shell: existing.shell,
+        cwd: existing.cwd,
+        status: 'running'
+      };
+    }
+
+    const shell = getDefaultShell();
+    const cwd = process.cwd();
+    this.publish({
+      type: 'terminal-status',
+      sessionId,
+      windowId,
+      status: 'starting',
+      shell,
+      cwd
+    });
+
+    try {
+      const child = spawn(shell, [], {
+        cwd,
+        env: process.env,
+        stdio: 'pipe'
+      });
+
+      const session: TerminalSession = {
+        key,
+        sessionId,
+        windowId,
+        shell,
+        cwd,
+        process: child
+      };
+      this.sessions.set(key, session);
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        this.publish({
+          type: 'terminal-output',
+          sessionId,
+          windowId,
+          stream: 'stdout',
+          chunk: chunk.toString('utf8')
+        });
+      });
+      child.stderr.on('data', (chunk: Buffer) => {
+        this.publish({
+          type: 'terminal-output',
+          sessionId,
+          windowId,
+          stream: 'stderr',
+          chunk: chunk.toString('utf8')
+        });
+      });
+      child.on('error', (error) => {
+        this.publish({
+          type: 'terminal-status',
+          sessionId,
+          windowId,
+          status: 'error',
+          shell,
+          cwd,
+          message: error.message
+        });
+      });
+      child.on('close', (code, signal) => {
+        this.sessions.delete(key);
+        this.publish({
+          type: 'terminal-exit',
+          sessionId,
+          windowId,
+          code,
+          signal
+        });
+        this.publish({
+          type: 'terminal-status',
+          sessionId,
+          windowId,
+          status: 'closed',
+          shell,
+          cwd,
+          message: buildCloseMessage(code, signal)
+        });
+      });
+
+      this.publish({
+        type: 'terminal-status',
+        sessionId,
+        windowId,
+        status: 'running',
+        shell,
+        cwd
+      });
+
+      this.write(sessionId, windowId, buildInitialBanner());
+      return {
+        shell,
+        cwd,
+        status: 'running'
+      };
+    } catch (error) {
+      const message = (error as Error).message;
+      this.publish({
+        type: 'terminal-status',
+        sessionId,
+        windowId,
+        status: 'error',
+        shell,
+        cwd,
+        message
+      });
+      throw error;
+    }
+  }
+
+  write(sessionId: string, windowId: string, input: string) {
+    const key = buildSessionKey(sessionId, windowId);
+    const session = this.sessions.get(key);
+    if (!session) {
+      throw new Error('Terminal session is not running.');
+    }
+    if (!session.process.stdin.writable) {
+      throw new Error('Terminal stdin is not writable.');
+    }
+    session.process.stdin.write(input);
+  }
+
+  close(sessionId: string, windowId: string) {
+    const key = buildSessionKey(sessionId, windowId);
+    const session = this.sessions.get(key);
+    if (!session) {
+      return false;
+    }
+    session.process.kill('SIGTERM');
+    return true;
+  }
+}
+
+function buildInitialBanner() {
+  const hostInfo = `${os.userInfo().username}@${os.hostname()}`;
+  const cwd = process.cwd();
+  return `echo "[Aionios Terminal] ${hostInfo}" && echo "cwd: ${cwd}" && echo "Type commands and press Run."\n`;
+}
+
+function buildCloseMessage(code: number | null, signal: NodeJS.Signals | null) {
+  if (signal) {
+    return `Terminal exited via signal ${signal}.`;
+  }
+  if (typeof code === 'number') {
+    return `Terminal exited with code ${code}.`;
+  }
+  return 'Terminal closed.';
+}

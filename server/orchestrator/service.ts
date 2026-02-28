@@ -3,7 +3,9 @@ import { buildGenerationPrompt, createContextEntry } from './context';
 import { SessionEventBus } from './event-bus';
 import { createLlmProvider } from './llm/provider';
 import { SessionStore } from './store';
+import { getSystemModuleSource } from './system-modules';
 import type {
+  SessionEvent,
   ModuleUpdateBridge,
   OpenWindowInput,
   UpdateStrategy,
@@ -61,6 +63,10 @@ export class WindowOrchestrator {
 
   attachModuleBridge(moduleBridge: ModuleUpdateBridge) {
     this.moduleBridge = moduleBridge;
+  }
+
+  publishSessionEvent(event: SessionEvent) {
+    this.eventBus.publish(event);
   }
 
   listWindows(sessionId: string): WindowSnapshot[] {
@@ -125,6 +131,9 @@ export class WindowOrchestrator {
     if (!windowRecord) {
       throw new Error(`Window ${input.sessionId}/${input.windowId} not found`);
     }
+    if (getSystemModuleSource(windowRecord.appId)) {
+      return this.getWindowSnapshot(input.sessionId, input.windowId);
+    }
     this.store.addContextEntry(
       input.sessionId,
       input.windowId,
@@ -148,6 +157,11 @@ export class WindowOrchestrator {
     });
 
     return this.getWindowSnapshot(input.sessionId, input.windowId);
+  }
+
+  closeWindow(sessionId: string, windowId: string) {
+    const deleted = this.store.deleteWindow(sessionId, windowId);
+    return deleted;
   }
 
   async rollbackWindow(sessionId: string, windowId: string, targetRevision: number) {
@@ -267,7 +281,13 @@ export default function WindowApp() {
 
     const prompt = buildGenerationPrompt(request);
     try {
-      const generated = await this.provider.generate(request);
+      const systemSource = getSystemModuleSource(record.appId);
+      const generated = systemSource
+        ? {
+            source: systemSource,
+            backend: 'system'
+          }
+        : await this.provider.generate(request);
       const validation = await validateGeneratedSource(generated.source);
       if (!validation.valid) {
         throw new Error(validation.issues.join('; '));

@@ -1,2 +1,2 @@
 export { WindowOrchestrator } from './service';
-export type { ModuleUpdateBridge, UpdateStrategy, WindowSnapshot } from './types';
+export type { ModuleUpdateBridge, SessionEvent, UpdateStrategy, WindowSnapshot } from './types';

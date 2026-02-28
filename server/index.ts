@@ -3,6 +3,7 @@ import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { createServer as createViteServer } from 'vite';
 import { WindowOrchestrator } from './orchestrator';
+import { TerminalManager } from './terminal/manager';
 import {
   ViteWindowModuleBridge,
   createWindowModulePlugin
@@ -13,6 +14,9 @@ const port = Number(process.env.PORT ?? 5173);
 async function startServer() {
   const app = express();
   const orchestrator = new WindowOrchestrator();
+  const terminalManager = new TerminalManager((event) => {
+    orchestrator.publishSessionEvent(event);
+  });
   const windowPlugin = createWindowModulePlugin(orchestrator);
   const vite = await createViteServer({
     plugins: [windowPlugin],
@@ -107,6 +111,13 @@ async function startServer() {
     }
   });
 
+  app.delete('/api/sessions/:sessionId/windows/:windowId', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    terminalManager.close(sessionId, windowId);
+    const removed = orchestrator.closeWindow(sessionId, windowId);
+    response.status(removed ? 204 : 404).end();
+  });
+
   app.post('/api/sessions/:sessionId/windows/:windowId/rollback', async (request, response) => {
     const { sessionId, windowId } = request.params;
     const { revision } = request.body as { revision?: number };
@@ -124,6 +135,75 @@ async function startServer() {
         message: (error as Error).message
       });
     }
+  });
+
+  app.post('/api/sessions/:sessionId/windows/:windowId/terminal/start', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    try {
+      const snapshot = orchestrator.getWindowSnapshot(sessionId, windowId);
+      if (snapshot.appId !== 'terminal') {
+        response.status(400).json({
+          message: 'Terminal API is only available for terminal windows.'
+        });
+        return;
+      }
+      const metadata = terminalManager.start(sessionId, windowId);
+      response.status(200).json(metadata);
+    } catch (error) {
+      const message = (error as Error).message;
+      response.status(message.includes('not found') ? 404 : 500).json({
+        message
+      });
+    }
+  });
+
+  app.post('/api/sessions/:sessionId/windows/:windowId/terminal/input', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    const { input } = request.body as { input?: string };
+    if (typeof input !== 'string' || input.length === 0) {
+      response.status(400).json({
+        message: 'input must be a non-empty string.'
+      });
+      return;
+    }
+    try {
+      const snapshot = orchestrator.getWindowSnapshot(sessionId, windowId);
+      if (snapshot.appId !== 'terminal') {
+        response.status(400).json({
+          message: 'Terminal API is only available for terminal windows.'
+        });
+        return;
+      }
+      terminalManager.write(sessionId, windowId, input);
+      response.status(202).json({ ok: true });
+    } catch (error) {
+      const message = (error as Error).message;
+      response.status(message.includes('not found') ? 404 : 400).json({
+        message
+      });
+    }
+  });
+
+  app.post('/api/sessions/:sessionId/windows/:windowId/terminal/stop', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    try {
+      const snapshot = orchestrator.getWindowSnapshot(sessionId, windowId);
+      if (snapshot.appId !== 'terminal') {
+        response.status(400).json({
+          message: 'Terminal API is only available for terminal windows.'
+        });
+        return;
+      }
+    } catch {
+      response.status(404).json({
+        closed: false
+      });
+      return;
+    }
+    const closed = terminalManager.close(sessionId, windowId);
+    response.status(closed ? 202 : 404).json({
+      closed
+    });
   });
 
   app.use(vite.middlewares);

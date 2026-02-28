@@ -1,12 +1,12 @@
 import type { Response } from 'express';
-import type { WindowEvent } from './types';
+import type { SessionEvent } from './types';
 
 interface SessionConnection {
   response: Response;
   heartbeatId: NodeJS.Timeout;
 }
 
-function writeSseMessage(response: Response, event: WindowEvent) {
+function writeSseMessage(response: Response, event: SessionEvent) {
   response.write(`event: ${event.type}\n`);
   response.write(`data: ${JSON.stringify(event)}\n\n`);
 }
@@ -42,7 +42,7 @@ export class SessionEventBus {
     });
   }
 
-  publish(event: WindowEvent) {
+  publish(event: SessionEvent) {
     const sessionConnections = this.connections.get(event.sessionId);
     if (!sessionConnections) {
       return;
