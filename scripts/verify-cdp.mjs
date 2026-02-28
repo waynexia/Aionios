@@ -31,11 +31,6 @@ function streamProcessOutput(child, logPath, label) {
   });
 }
 
-function parseRevision(text) {
-  const match = /rev\s+(\d+)/i.exec(text ?? '');
-  return match ? Number(match[1]) : 0;
-}
-
 async function waitFor(check, message, timeoutMs = VERIFY_TIMEOUT_MS) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
@@ -153,10 +148,10 @@ async function main() {
 
   const opened = await evaluate(
     Runtime,
-    "(() => { const icon = document.querySelector('.desktop-icon'); if (!icon) return false; icon.click(); return true; })()"
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal')); if (!icon) return false; icon.click(); return true; })()"
   );
   if (!opened) {
-    throw new Error('Failed to click desktop app icon');
+    throw new Error('Failed to click Terminal app icon');
   }
 
   await waitFor(
@@ -167,43 +162,55 @@ async function main() {
           "document.querySelectorAll('.window-frame').length === 1 && document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() === 'ready'"
         )
       ),
-    'Window did not reach ready state after initial generation'
+    'Terminal window did not reach ready state after opening'
   );
 
-  const beforeText = await evaluate(
+  const started = await evaluate(
     Runtime,
-    "document.querySelector('.window-frame__title small')?.textContent ?? ''"
+    "(() => { const frame = document.querySelector('.window-frame[data-app-id=\"terminal\"]'); if (!(frame instanceof HTMLElement)) return false; const sessionId = frame.dataset.sessionId; const windowId = frame.dataset.windowId; if (!sessionId || !windowId) return false; return fetch(`/api/sessions/${sessionId}/windows/${windowId}/terminal/start`, { method: 'POST' }).then((response) => response.ok); })()"
   );
-  const beforeRevision = parseRevision(beforeText);
+  if (!started) {
+    throw new Error('Could not start host terminal session');
+  }
 
-  const clickedEvolve = await evaluate(
-    Runtime,
-    "(() => { const button = Array.from(document.querySelectorAll('button')).find((item) => item.textContent?.includes('Ask LLM to Evolve')); if (!button) return false; button.click(); return true; })()"
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          "document.querySelector('.window-frame[data-app-id=\"terminal\"] pre') instanceof HTMLElement"
+        )
+      ),
+    'Terminal output panel is not available'
   );
-  if (!clickedEvolve) {
-    throw new Error('Could not find the evolve button in generated app');
+
+  const submitted = await evaluate(
+    Runtime,
+    "(() => { const frame = document.querySelector('.window-frame[data-app-id=\"terminal\"]'); if (!(frame instanceof HTMLElement)) return false; const sessionId = frame.dataset.sessionId; const windowId = frame.dataset.windowId; if (!sessionId || !windowId) return false; return fetch(`/api/sessions/${sessionId}/windows/${windowId}/terminal/input`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ input: 'echo __AIONIOS_TERMINAL_OK__\\n' }) }).then((response) => response.ok); })()"
+  );
+  if (!submitted) {
+    throw new Error('Could not send host terminal command');
   }
 
   await waitFor(
     async () => {
       const result = await evaluate(
         Runtime,
-        "(() => ({ status: document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '', revisionText: document.querySelector('.window-frame__title small')?.textContent ?? '', windowCount: document.querySelectorAll('.window-frame').length, iconCount: document.querySelectorAll('.desktop-icon').length }))()"
+        "(() => ({ status: document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '', output: document.querySelector('.window-frame pre')?.textContent ?? '', windowCount: document.querySelectorAll('.window-frame').length, iconCount: document.querySelectorAll('.desktop-icon').length }))()"
       );
-      const afterRevision = parseRevision(result.revisionText);
       return (
         result.status === 'ready' &&
         result.windowCount === 1 &&
         result.iconCount >= 1 &&
-        afterRevision > beforeRevision
+        result.output.includes('__AIONIOS_TERMINAL_OK__')
       );
     },
-    'Window update loop failed to complete with local window-only update'
+    'Terminal command execution did not produce expected host output'
   );
 
   const finalState = await evaluate(
     Runtime,
-    "(() => ({ revisionText: document.querySelector('.window-frame__title small')?.textContent ?? '', status: document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '', windows: document.querySelectorAll('.window-frame').length, icons: document.querySelectorAll('.desktop-icon').length }))()"
+    "(() => ({ title: document.querySelector('.window-frame__title span')?.textContent ?? '', status: document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '', windows: document.querySelectorAll('.window-frame').length, icons: document.querySelectorAll('.desktop-icon').length }))()"
   );
   console.log('[verify:cdp] success:', finalState);
   console.log('[verify:cdp] logs:', logDir);

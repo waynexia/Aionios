@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getSystemModuleSource } from './system-modules';
 import { SessionStore } from './store';
 import { validateGeneratedSource } from './validator';
 
@@ -94,5 +95,14 @@ export default function WindowApp() { return <div />; }
 `);
     expect(result.valid).toBe(false);
     expect(result.issues.join('\n')).toContain('Disallowed import');
+  });
+});
+
+describe('system modules', () => {
+  it('provides terminal system app source', () => {
+    const source = getSystemModuleSource('terminal');
+    expect(source).toBeDefined();
+    expect(source).toContain('export default function WindowApp');
+    expect(source).toContain('host.terminal.sendInput');
   });
 });
