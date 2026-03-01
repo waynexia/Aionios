@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { createServer as createViteServer } from 'vite';
+import { PreferenceConfigStore } from './config';
 import { WindowOrchestrator } from './orchestrator';
 import { TerminalManager } from './terminal/manager';
 import {
@@ -13,10 +14,13 @@ const port = Number(process.env.PORT ?? 5173);
 
 async function startServer() {
   const app = express();
-  const orchestrator = new WindowOrchestrator();
+  const preferenceConfigStore = new PreferenceConfigStore();
+  await preferenceConfigStore.load();
+
+  const orchestrator = new WindowOrchestrator(() => preferenceConfigStore.getConfig());
   const terminalManager = new TerminalManager((event) => {
     orchestrator.publishSessionEvent(event);
-  });
+  }, () => preferenceConfigStore.getConfig());
   const windowPlugin = createWindowModulePlugin(orchestrator);
   const vite = await createViteServer({
     plugins: [windowPlugin],
@@ -33,6 +37,26 @@ async function startServer() {
   app.post('/api/sessions', (_request, response) => {
     const sessionId = orchestrator.createSession();
     response.status(201).json({ sessionId });
+  });
+
+  app.get('/api/config', (_request, response) => {
+    response.status(200).json(preferenceConfigStore.getConfig());
+  });
+
+  app.put('/api/config', async (request, response) => {
+    try {
+      const updated = await preferenceConfigStore.update(request.body);
+      response.status(200).json(updated);
+    } catch (error) {
+      const message = (error as Error).message;
+      const isValidationError =
+        message.includes('Unknown preference') ||
+        message.includes('must be') ||
+        message.includes('payload');
+      response.status(isValidationError ? 400 : 500).json({
+        message
+      });
+    }
   });
 
   app.get('/api/sessions/:sessionId/events', (request, response) => {

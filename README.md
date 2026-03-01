@@ -6,10 +6,11 @@ The host (desktop/taskbar/window manager/state) is static React code, while each
 ## What it includes
 
 - Desktop shell with icons, window manager, and taskbar.
-- Built-in **Terminal** system app backed by the host Node server shell process.
-- Host API bridge for generated apps (`openApp`, `readFile`, `writeFile`, `requestUpdate`, `listFiles`).
+- Built-in system apps backed by the host Node server: **Terminal** and **Preference**.
+- Host API bridge for generated apps (`openApp`, `readFile`, `writeFile`, `requestUpdate`, `listFiles`, `preference`, `terminal`).
 - Thin Node orchestrator for session/window lifecycle, prompt context, revision history, rollback, and event streaming.
 - Terminal API endpoints for start/input/stop with per-window stream events over SSE.
+- Preference API endpoints (`GET /api/config`, `PUT /api/config`) with TOML persistence.
 - Vite virtual module plugin: generated window code is kept in memory and loaded from `/@window-app/<session>/<window>/entry.tsx`.
 - Update loop:
   1. user opens app → window appears in loading state
@@ -29,8 +30,14 @@ Then open `http://localhost:5173`.
 
 ## LLM backend
 
-- Default backend is mock (`AIONIOS_LLM_BACKEND=mock`).
-- Codex backend is supported through CLI execution:
+- Runtime preferences are server-owned and persisted in TOML at `.aionios/preferences.toml` (override path with `AIONIOS_CONFIG_PATH`).
+- The Preference system app can edit:
+  - `llmBackend` (`mock` or `codex`)
+  - `codexCommand`
+  - `codexTimeoutMs`
+  - `terminalShell`
+- Environment variables (`AIONIOS_LLM_BACKEND`, `AIONIOS_CODEX_COMMAND`, `AIONIOS_CODEX_TIMEOUT_MS`, `AIONIOS_TERMINAL_SHELL`) are used as initial defaults when no config file exists.
+- Codex backend can still be bootstrapped via env defaults:
 
 ```bash
 AIONIOS_LLM_BACKEND=codex AIONIOS_CODEX_COMMAND="codex exec --skip-git-repo-check --output-last-message" npm run dev

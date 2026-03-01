@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSystemModuleSource } from './system-modules';
+import { getSystemModuleSource, isSystemApp } from './system-modules';
 import { SessionStore } from './store';
 import { validateGeneratedSource } from './validator';
 
@@ -104,5 +104,15 @@ describe('system modules', () => {
     expect(source).toBeDefined();
     expect(source).toContain('export default function WindowApp');
     expect(source).toContain('host.terminal.sendInput');
+  });
+
+  it('provides preference system app source and marks it as system', () => {
+    const source = getSystemModuleSource('preference');
+    expect(source).toBeDefined();
+    expect(source).toContain('host.preference');
+    expect(source).toContain('.read()');
+    expect(source).toContain('data-pref-field="llm-backend"');
+    expect(isSystemApp('preference')).toBe(true);
+    expect(isSystemApp('notes')).toBe(false);
   });
 });

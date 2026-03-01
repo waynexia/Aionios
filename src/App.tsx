@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import {
   closeWindow,
   createSession,
+  getPreferenceConfig,
   openWindow,
   requestWindowUpdate,
   sendTerminalInput,
   startTerminal,
-  stopTerminal
+  stopTerminal,
+  updatePreferenceConfig
 } from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
 import { DesktopIcons } from './components/DesktopIcons';
@@ -497,6 +499,10 @@ export default function App() {
                 await requestUpdateForWindow(windowItem.windowId, instruction);
               },
               listFiles: async () => Object.values(filesRef.current),
+              preference: {
+                read: async () => getPreferenceConfig(),
+                update: async (input) => updatePreferenceConfig(input)
+              },
               terminal: {
                 start: async () => {
                   const currentSessionId = sessionRef.current;

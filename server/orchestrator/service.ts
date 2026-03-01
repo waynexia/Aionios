@@ -1,9 +1,10 @@
 import { nanoid } from 'nanoid';
+import type { PreferenceConfig } from '../config';
 import { buildGenerationPrompt, createContextEntry } from './context';
 import { SessionEventBus } from './event-bus';
 import { createLlmProvider } from './llm/provider';
 import { SessionStore } from './store';
-import { getSystemModuleSource } from './system-modules';
+import { getSystemModuleSource, isSystemApp } from './system-modules';
 import type {
   SessionEvent,
   ModuleUpdateBridge,
@@ -43,9 +44,10 @@ function pickUpdateStrategy(previousSource: string | undefined, nextSource: stri
 export class WindowOrchestrator {
   private readonly store = new SessionStore();
   private readonly eventBus = new SessionEventBus();
-  private readonly provider = createLlmProvider();
   private moduleBridge?: ModuleUpdateBridge;
   private readonly windowTaskQueue = new Map<string, Promise<void>>();
+
+  constructor(private readonly readConfig: () => PreferenceConfig) {}
 
   createSession() {
     const sessionId = nanoid(16);
@@ -131,7 +133,7 @@ export class WindowOrchestrator {
     if (!windowRecord) {
       throw new Error(`Window ${input.sessionId}/${input.windowId} not found`);
     }
-    if (getSystemModuleSource(windowRecord.appId)) {
+    if (isSystemApp(windowRecord.appId)) {
       return this.getWindowSnapshot(input.sessionId, input.windowId);
     }
     this.store.addContextEntry(
@@ -287,7 +289,7 @@ export default function WindowApp() {
             source: systemSource,
             backend: 'system'
           }
-        : await this.provider.generate(request);
+        : await createLlmProvider(this.readConfig()).generate(request);
       const validation = await validateGeneratedSource(generated.source);
       if (!validation.valid) {
         throw new Error(validation.issues.join('; '));

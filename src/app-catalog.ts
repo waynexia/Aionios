@@ -9,6 +9,13 @@ export const APP_CATALOG: AppDefinition[] = [
     kind: 'system'
   },
   {
+    appId: 'preference',
+    title: 'Preference',
+    icon: '⚙️',
+    hint: 'Server runtime configuration',
+    kind: 'system'
+  },
+  {
     appId: 'notes',
     title: 'LLM Notes',
     icon: '📝',

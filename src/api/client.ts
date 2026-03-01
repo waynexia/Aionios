@@ -1,4 +1,8 @@
-import type { ServerWindowSnapshot } from '../types';
+import type {
+  PreferenceConfig,
+  PreferenceConfigUpdate,
+  ServerWindowSnapshot
+} from '../types';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -17,6 +21,17 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 export async function createSession() {
   return requestJson<{ sessionId: string }>('/api/sessions', {
     method: 'POST'
+  });
+}
+
+export async function getPreferenceConfig() {
+  return requestJson<PreferenceConfig>('/api/config');
+}
+
+export async function updatePreferenceConfig(input: PreferenceConfigUpdate) {
+  return requestJson<PreferenceConfig>('/api/config', {
+    method: 'PUT',
+    body: JSON.stringify(input)
   });
 }
 

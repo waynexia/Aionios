@@ -2,6 +2,17 @@ export type ClientWindowStatus = 'loading' | 'ready' | 'error';
 
 export type UpdateStrategy = 'hmr' | 'remount';
 
+export type LlmBackend = 'mock' | 'codex';
+
+export interface PreferenceConfig {
+  llmBackend: LlmBackend;
+  codexCommand: string;
+  codexTimeoutMs: number;
+  terminalShell: string;
+}
+
+export type PreferenceConfigUpdate = Partial<PreferenceConfig>;
+
 export interface AppDefinition {
   appId: string;
   title: string;
@@ -51,6 +62,11 @@ export interface TerminalHostBridge {
   stop: () => Promise<void>;
 }
 
+export interface PreferenceHostBridge {
+  read: () => Promise<PreferenceConfig>;
+  update: (input: PreferenceConfigUpdate) => Promise<PreferenceConfig>;
+}
+
 export interface HostBridge {
   sessionId: string;
   windowId: string;
@@ -60,6 +76,7 @@ export interface HostBridge {
   writeFile: (path: string, content: string) => Promise<void>;
   requestUpdate: (instruction: string) => Promise<void>;
   listFiles: () => Promise<HostFileEntry[]>;
+  preference: PreferenceHostBridge;
   terminal: TerminalHostBridge;
 }
 

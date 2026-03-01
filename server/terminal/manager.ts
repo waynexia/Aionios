@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import os from 'node:os';
+import type { PreferenceConfig } from '../config';
 import type {
   TerminalExitEvent,
   TerminalOutputEvent,
@@ -22,26 +22,6 @@ interface TerminalSessionMetadata {
   status: 'running';
 }
 
-function getDefaultShell() {
-  const configured = process.env.AIONIOS_TERMINAL_SHELL;
-  if (configured) {
-    return configured;
-  }
-
-  if (process.platform === 'win32') {
-    return process.env.ComSpec ?? 'cmd.exe';
-  }
-
-  const candidates = ['/bin/bash', '/usr/bin/bash', '/bin/sh'];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return process.env.SHELL ?? 'sh';
-}
-
 function buildSessionKey(sessionId: string, windowId: string) {
   return `${sessionId}:${windowId}`;
 }
@@ -52,7 +32,8 @@ export class TerminalManager {
   constructor(
     private readonly publish: (
       event: TerminalStatusEvent | TerminalOutputEvent | TerminalExitEvent
-    ) => void
+    ) => void,
+    private readonly readConfig: () => PreferenceConfig
   ) {}
 
   start(sessionId: string, windowId: string): TerminalSessionMetadata {
@@ -69,7 +50,7 @@ export class TerminalManager {
       this.sessions.delete(key);
     }
 
-    const shell = getDefaultShell();
+    const shell = this.readConfig().terminalShell;
     const cwd = process.cwd();
     this.publish({
       type: 'terminal-status',
