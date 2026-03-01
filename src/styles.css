@@ -275,9 +275,36 @@ body,
 }
 
 .taskbar__windows {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 8px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.taskbar__clock {
+  margin-left: auto;
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(71, 85, 105, 0.8);
+  background: rgba(15, 23, 42, 0.85);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.taskbar__clock-time {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.taskbar__clock-date {
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.95);
 }
 
 .taskbar__window {

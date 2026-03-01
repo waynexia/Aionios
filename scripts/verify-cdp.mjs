@@ -204,22 +204,55 @@ async function main() {
     // Vite may reload after first dependency optimization; re-check shell below.
   }
 
-  await waitFor(
-    async () =>
-      Boolean(
-        await evaluate(
-          Runtime,
-          "document.querySelectorAll('.desktop-icon').length >= 1 && document.querySelector('.taskbar') !== null && document.querySelector('.desktop-shell') !== null"
-        )
-    ),
-    'Desktop shell did not stabilize after dependency warm-up'
-  );
+	  await waitFor(
+	    async () =>
+	      Boolean(
+	        await evaluate(
+	          Runtime,
+	          "document.querySelectorAll('.desktop-icon').length >= 1 && document.querySelector('.taskbar') !== null && document.querySelector('.desktop-shell') !== null"
+	        )
+	    ),
+	    'Desktop shell did not stabilize after dependency warm-up'
+	  );
 
-  const contextMenuAnchor = await evaluate(
-    Runtime,
-    `(() => {
-      const workspace = document.querySelector('.desktop-shell__workspace');
-      if (!(workspace instanceof HTMLElement)) {
+	  await waitFor(
+	    async () =>
+	      Boolean(
+	        await evaluate(
+	          Runtime,
+	          `(() => {
+            const clock = document.querySelector('[data-taskbar-clock]');
+            if (!(clock instanceof HTMLElement)) return false;
+            const time = clock.querySelector('[data-taskbar-time]')?.textContent?.trim() ?? '';
+            const date = clock.querySelector('[data-taskbar-date]')?.textContent?.trim() ?? '';
+            return /^\\d{2}:\\d{2}:\\d{2}$/.test(time) && /^\\d{4}\\/\\d{2}\\/\\d{2}$/.test(date);
+          })()`
+	        )
+	      ),
+	    'Taskbar clock did not render'
+	  );
+
+	  const initialClockTime = await evaluate(
+	    Runtime,
+	    "document.querySelector('[data-taskbar-time]')?.textContent?.trim() ?? ''"
+	  );
+	  await waitFor(
+	    async () => {
+	      const nextClockTime = await evaluate(
+	        Runtime,
+	        "document.querySelector('[data-taskbar-time]')?.textContent?.trim() ?? ''"
+	      );
+	      return Boolean(nextClockTime) && nextClockTime !== initialClockTime;
+	    },
+	    'Taskbar clock did not tick',
+	    5000
+	  );
+
+	  const contextMenuAnchor = await evaluate(
+	    Runtime,
+	    `(() => {
+	      const workspace = document.querySelector('.desktop-shell__workspace');
+	      if (!(workspace instanceof HTMLElement)) {
         return null;
       }
       const rect = workspace.getBoundingClientRect();

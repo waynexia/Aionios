@@ -1,9 +1,47 @@
 import type { DesktopWindow } from '../types';
+import { useEffect, useState } from 'react';
 
 interface TaskbarProps {
   windows: DesktopWindow[];
   focusedWindowId?: string;
   onWindowClick: (windowId: string) => void;
+}
+
+function formatTwoDigits(value: number) {
+  return String(value).padStart(2, '0');
+}
+
+function formatClockTime(now: Date) {
+  return `${formatTwoDigits(now.getHours())}:${formatTwoDigits(now.getMinutes())}:${formatTwoDigits(
+    now.getSeconds()
+  )}`;
+}
+
+function formatClockDate(now: Date) {
+  return `${now.getFullYear()}/${formatTwoDigits(now.getMonth() + 1)}/${formatTwoDigits(now.getDate())}`;
+}
+
+function TaskbarClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNow(new Date());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="taskbar__clock" data-taskbar-clock>
+      <time className="taskbar__clock-time" data-taskbar-time dateTime={now.toISOString()}>
+        {formatClockTime(now)}
+      </time>
+      <time className="taskbar__clock-date" data-taskbar-date dateTime={now.toISOString()}>
+        {formatClockDate(now)}
+      </time>
+    </div>
+  );
 }
 
 export function Taskbar({ windows, focusedWindowId, onWindowClick }: TaskbarProps) {
@@ -24,6 +62,7 @@ export function Taskbar({ windows, focusedWindowId, onWindowClick }: TaskbarProp
           </button>
         ))}
       </div>
+      <TaskbarClock />
     </footer>
   );
 }
