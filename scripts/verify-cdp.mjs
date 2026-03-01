@@ -189,6 +189,38 @@ async function main() {
     'Desktop shell did not stabilize after dependency warm-up'
   );
 
+  const terminalSelected = await evaluate(
+    Runtime,
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal')); if (!icon) return false; icon.click(); return true; })()"
+  );
+  if (!terminalSelected) {
+    throw new Error('Failed to click Terminal app icon for selection');
+  }
+  await delay(80);
+
+  const terminalSelectionState = await evaluate(
+    Runtime,
+    `(() => {
+      const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal'));
+      if (!(icon instanceof HTMLElement)) {
+        return null;
+      }
+      return {
+        selected: icon.classList.contains('desktop-icon--selected'),
+        windowCount: document.querySelectorAll('.window-frame').length
+      };
+    })()`
+  );
+  if (!terminalSelectionState) {
+    throw new Error('Terminal icon selection state is unavailable');
+  }
+  if (!terminalSelectionState.selected) {
+    throw new Error('Desktop icon did not show selected state after single click');
+  }
+  if (terminalSelectionState.windowCount !== 0) {
+    throw new Error('Desktop icon should not open a window on single click');
+  }
+
   const terminalIconBeforeDrag = await evaluate(
     Runtime,
     `(() => {
@@ -307,10 +339,10 @@ async function main() {
 
   const opened = await evaluate(
     Runtime,
-    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal')); if (!icon) return false; icon.click(); return true; })()"
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal')); if (!icon) return false; icon.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"
   );
   if (!opened) {
-    throw new Error('Failed to click Terminal app icon');
+    throw new Error('Failed to double click Terminal app icon');
   }
 
   await waitFor(
@@ -398,10 +430,10 @@ async function main() {
 
   const openedPreference = await evaluate(
     Runtime,
-    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Preference')); if (!icon) return false; icon.click(); return true; })()"
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Preference')); if (!icon) return false; icon.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"
   );
   if (!openedPreference) {
-    throw new Error('Failed to click Preference app icon');
+    throw new Error('Failed to double click Preference app icon');
   }
 
   await waitFor(
@@ -519,10 +551,10 @@ async function main() {
 
   const openedDirectory = await evaluate(
     Runtime,
-    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Directory')); if (!icon) return false; icon.click(); return true; })()"
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Directory')); if (!icon) return false; icon.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"
   );
   if (!openedDirectory) {
-    throw new Error('Failed to click Directory app icon');
+    throw new Error('Failed to double click Directory app icon');
   }
 
   await waitFor(
@@ -594,10 +626,10 @@ async function main() {
 
   const openedMedia = await evaluate(
     Runtime,
-    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Media')); if (!icon) return false; icon.click(); return true; })()"
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Media')); if (!icon) return false; icon.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"
   );
   if (!openedMedia) {
-    throw new Error('Failed to click Media app icon');
+    throw new Error('Failed to double click Media app icon');
   }
 
   await waitFor(
@@ -657,10 +689,10 @@ async function main() {
 
   const openedEditor = await evaluate(
     Runtime,
-    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Editor')); if (!icon) return false; icon.click(); return true; })()"
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Editor')); if (!icon) return false; icon.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); return true; })()"
   );
   if (!openedEditor) {
-    throw new Error('Failed to click Editor app icon');
+    throw new Error('Failed to double click Editor app icon');
   }
 
   await waitFor(

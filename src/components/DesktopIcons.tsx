@@ -58,6 +58,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
   const [positions, setPositions] = useState<Record<string, IconPosition>>(() =>
     createDefaultPositions(apps)
   );
+  const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
 
   useEffect(() => {
     setPositions((current) => {
@@ -82,6 +83,23 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     });
   }, [apps]);
 
+  useEffect(() => {
+    if (!selectedAppId) {
+      return;
+    }
+    if (apps.some((app) => app.appId === selectedAppId)) {
+      return;
+    }
+    setSelectedAppId(null);
+  }, [apps, selectedAppId]);
+
+  const onDesktopPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    setSelectedAppId(null);
+  };
+
   const onIconPointerDown = (
     event: ReactPointerEvent<HTMLButtonElement>,
     appId: string
@@ -89,6 +107,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     if (event.button !== 0) {
       return;
     }
+    setSelectedAppId(appId);
     const container = containerRef.current;
     if (!container) {
       return;
@@ -178,20 +197,39 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
       event.stopPropagation();
       return;
     }
+    setSelectedAppId(appId);
+  };
+
+  const onIconDoubleClick = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    appId: string
+  ) => {
+    const suppressUntil = suppressedOpenUntilRef.current[appId] ?? 0;
+    if (suppressUntil > Date.now()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     onOpenApp(appId);
   };
 
   return (
-    <section ref={containerRef} className="desktop-icons" aria-label="Desktop apps">
+    <section
+      ref={containerRef}
+      className="desktop-icons"
+      aria-label="Desktop apps"
+      onPointerDown={onDesktopPointerDown}
+    >
       {apps.map((app) => {
         const position = positions[app.appId] ?? {
           x: ICON_INITIAL_X,
           y: ICON_INITIAL_Y
         };
+        const isSelected = selectedAppId === app.appId;
         return (
           <button
             key={app.appId}
-            className="desktop-icon"
+            className={`desktop-icon${isSelected ? ' desktop-icon--selected' : ''}`}
             style={{
               left: `${position.x}px`,
               top: `${position.y}px`
@@ -201,6 +239,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
             onPointerUp={(event) => onIconPointerEnd(event, app.appId)}
             onPointerCancel={(event) => onIconPointerEnd(event, app.appId)}
             onClick={(event) => onIconClick(event, app.appId)}
+            onDoubleClick={(event) => onIconDoubleClick(event, app.appId)}
             title={`${app.title} — ${app.hint}`}
           >
             <span className="desktop-icon__emoji">{app.icon}</span>
