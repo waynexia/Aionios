@@ -43,6 +43,11 @@ interface AppState {
   terminals: Record<string, TerminalStateSnapshot>;
 }
 
+interface CanvasDimensions {
+  width: number;
+  height: number;
+}
+
 type AppAction =
   | {
       type: 'session-ready';
@@ -61,6 +66,7 @@ type AppAction =
       initialStatus?: ClientWindowStatus;
       initialRevision?: number;
       initialError?: string;
+      canvas?: CanvasDimensions;
     }
   | {
       type: 'window-focus';
@@ -137,13 +143,41 @@ function normalizeTerminalBuffer(buffer: string) {
   return buffer.slice(buffer.length - MAX_TERMINAL_BUFFER_CHARS);
 }
 
-function createInitialWindowBounds(windows: DesktopWindow[]): WindowBounds {
+function clamp(value: number, min: number, max: number) {
+  if (value < min) {
+    return min;
+  }
+  if (value > max) {
+    return max;
+  }
+  return value;
+}
+
+function createInitialWindowBounds(
+  windows: DesktopWindow[],
+  canvas?: CanvasDimensions
+): WindowBounds {
   const cascadeIndex = windows.length % WINDOW_CASCADE_LIMIT;
+  const baseX = 18 + cascadeIndex * WINDOW_CASCADE_X;
+  const baseY = 18 + cascadeIndex * WINDOW_CASCADE_Y;
+  if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
+    return {
+      x: baseX,
+      y: baseY,
+      width: DEFAULT_WINDOW_WIDTH,
+      height: DEFAULT_WINDOW_HEIGHT
+    };
+  }
+
+  const boundedWidth = Math.max(1, Math.floor(canvas.width));
+  const boundedHeight = Math.max(1, Math.floor(canvas.height));
+  const width = clamp(DEFAULT_WINDOW_WIDTH, 1, boundedWidth);
+  const height = clamp(DEFAULT_WINDOW_HEIGHT, 1, boundedHeight);
   return {
-    x: 18 + cascadeIndex * WINDOW_CASCADE_X,
-    y: 18 + cascadeIndex * WINDOW_CASCADE_Y,
-    width: DEFAULT_WINDOW_WIDTH,
-    height: DEFAULT_WINDOW_HEIGHT
+    x: clamp(baseX, 0, boundedWidth - width),
+    y: clamp(baseY, 0, boundedHeight - height),
+    width,
+    height
   };
 }
 
@@ -268,7 +302,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
       };
     case 'window-open-local': {
       const nextZ = state.nextZIndex + 1;
-      const initialBounds = createInitialWindowBounds(state.windows);
+      const initialBounds = createInitialWindowBounds(state.windows, action.canvas);
       const nextWindow: DesktopWindow = {
         windowId: action.windowId,
         sessionId: action.sessionId,
@@ -387,6 +421,7 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const filesRef = useRef(state.files);
   const sessionRef = useRef(state.sessionId);
+  const windowCanvasRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     filesRef.current = state.files;
@@ -477,6 +512,17 @@ export default function App() {
     };
   }, [state.sessionId]);
 
+  const getWindowCanvasDimensions = useCallback((): CanvasDimensions | undefined => {
+    const rect = windowCanvasRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) {
+      return undefined;
+    }
+    return {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height)
+    };
+  }, []);
+
   const openApp = useCallback(
     async (appId: string) => {
       if (!state.sessionId) {
@@ -486,6 +532,7 @@ export default function App() {
       const title = definition?.title ?? `App ${appId}`;
       const windowId = randomWindowId();
       const isSystemApp = definition?.kind === 'system';
+      const canvas = getWindowCanvasDimensions();
 
       if (isSystemApp) {
         try {
@@ -503,7 +550,8 @@ export default function App() {
             title: snapshot.title,
             initialStatus: snapshot.status,
             initialRevision: snapshot.revision,
-            initialError: snapshot.error
+            initialError: snapshot.error,
+            canvas
           });
         } catch (error) {
           dispatch({
@@ -513,7 +561,8 @@ export default function App() {
             appId,
             title,
             initialStatus: 'error',
-            initialError: (error as Error).message
+            initialError: (error as Error).message,
+            canvas
           });
         }
         return;
@@ -524,7 +573,8 @@ export default function App() {
         windowId,
         sessionId: state.sessionId,
         appId,
-        title
+        title,
+        canvas
       });
       try {
         const snapshot = await openWindow({
@@ -564,7 +614,7 @@ export default function App() {
         });
       }
     },
-    [state.sessionId]
+    [getWindowCanvasDimensions, state.sessionId]
   );
 
   const requestUpdateForWindow = useCallback(
@@ -611,7 +661,7 @@ export default function App() {
           <DesktopIcons apps={APP_CATALOG} onOpenApp={openApp} />
           <FilePanel files={files} />
         </div>
-        <section className="window-canvas">
+        <section ref={windowCanvasRef} className="window-canvas">
           {orderedWindows.map((windowItem) => {
             if (windowItem.minimized) {
               return null;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { initialState, reducer } from './App';
 
-function buildStateWithWindow() {
+function buildStateWithWindow(canvas?: { width: number; height: number }) {
   const withSession = reducer(initialState, {
     type: 'session-ready',
     sessionId: 'session-1'
@@ -11,7 +11,8 @@ function buildStateWithWindow() {
     sessionId: 'session-1',
     windowId: 'window-1',
     appId: 'writer',
-    title: 'Writer'
+    title: 'Writer',
+    canvas
   });
 }
 
@@ -170,6 +171,21 @@ describe('window event ordering guard', () => {
       y: 70,
       width: 900,
       height: 640,
+      maximized: false
+    });
+  });
+
+  it('clamps initial bounds to the available canvas dimensions', () => {
+    const opened = buildStateWithWindow({
+      width: 660,
+      height: 640
+    });
+
+    expect(getWindow(opened)).toMatchObject({
+      x: 0,
+      y: 18,
+      width: 660,
+      height: 520,
       maximized: false
     });
   });
