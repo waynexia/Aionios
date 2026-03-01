@@ -3,6 +3,7 @@ import type { DesktopWindow } from '../types';
 
 interface WindowFrameProps {
   windowItem: DesktopWindow;
+  showRevision?: boolean;
   focused: boolean;
   onFocus: () => void;
   onClose: () => void;
@@ -12,6 +13,7 @@ interface WindowFrameProps {
 
 export function WindowFrame({
   windowItem,
+  showRevision = true,
   focused,
   onFocus,
   onClose,
@@ -31,7 +33,7 @@ export function WindowFrame({
         <div className="window-frame__title">
           <span>{windowItem.title}</span>
           <small>
-            {windowItem.appId} · rev {windowItem.revision}
+            {showRevision ? `${windowItem.appId} · rev ${windowItem.revision}` : windowItem.appId}
           </small>
         </div>
         <div className="window-frame__actions">

@@ -57,6 +57,9 @@ type AppAction =
       sessionId: string;
       appId: string;
       title: string;
+      initialStatus?: ClientWindowStatus;
+      initialRevision?: number;
+      initialError?: string;
     }
   | {
       type: 'window-focus';
@@ -228,12 +231,13 @@ function reducer(state: AppState, action: AppAction): AppState {
         sessionId: action.sessionId,
         appId: action.appId,
         title: action.title,
-        status: 'loading',
-        revision: 0,
+        status: action.initialStatus ?? 'loading',
+        revision: action.initialRevision ?? 0,
         strategy: 'remount',
         mountNonce: 0,
         minimized: false,
-        zIndex: nextZ
+        zIndex: nextZ,
+        error: action.initialError
       };
       return {
         ...state,
@@ -404,6 +408,40 @@ export default function App() {
       const definition = getAppDefinition(appId);
       const title = definition?.title ?? `App ${appId}`;
       const windowId = randomWindowId();
+      const isSystemApp = definition?.kind === 'system';
+
+      if (isSystemApp) {
+        try {
+          const snapshot = await openWindow({
+            sessionId: state.sessionId,
+            windowId,
+            appId,
+            title
+          });
+          dispatch({
+            type: 'window-open-local',
+            windowId,
+            sessionId: snapshot.sessionId,
+            appId: snapshot.appId,
+            title: snapshot.title,
+            initialStatus: snapshot.status,
+            initialRevision: snapshot.revision,
+            initialError: snapshot.error
+          });
+        } catch (error) {
+          dispatch({
+            type: 'window-open-local',
+            windowId,
+            sessionId: state.sessionId,
+            appId,
+            title,
+            initialStatus: 'error',
+            initialError: (error as Error).message
+          });
+        }
+        return;
+      }
+
       dispatch({
         type: 'window-open-local',
         windowId,
@@ -412,11 +450,30 @@ export default function App() {
         title
       });
       try {
-        await openWindow({
+        const snapshot = await openWindow({
           sessionId: state.sessionId,
           windowId,
           appId,
           title
+        });
+        dispatch({
+          type: 'window-server-event',
+          event: {
+            type:
+              snapshot.status === 'ready'
+                ? 'window-ready'
+                : snapshot.status === 'error'
+                  ? 'window-error'
+                  : 'window-status',
+            sessionId: snapshot.sessionId,
+            windowId: snapshot.windowId,
+            appId: snapshot.appId,
+            title: snapshot.title,
+            status: snapshot.status,
+            revision: snapshot.revision,
+            strategy: 'remount',
+            error: snapshot.error
+          }
         });
       } catch (error) {
         dispatch({
@@ -553,6 +610,7 @@ export default function App() {
               <WindowFrame
                 key={`${windowItem.windowId}:${windowItem.mountNonce}`}
                 windowItem={windowItem}
+                showRevision={getAppDefinition(windowItem.appId)?.kind !== 'system'}
                 focused={windowItem.windowId === state.focusedWindowId}
                 onFocus={() => dispatch({ type: 'window-focus', windowId: windowItem.windowId })}
                 onMinimize={() =>

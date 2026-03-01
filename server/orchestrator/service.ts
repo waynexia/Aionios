@@ -101,6 +101,43 @@ export class WindowOrchestrator {
         `Window opened for app "${windowRecord.appId}" titled "${windowRecord.title}".`
       )
     );
+
+    const systemSource = getSystemModuleSource(windowRecord.appId);
+    if (systemSource) {
+      const revision = this.store.addRevision(
+        input.sessionId,
+        input.windowId,
+        systemSource,
+        '[system module preload]',
+        'system',
+        'remount'
+      );
+      this.store.addContextEntry(
+        input.sessionId,
+        input.windowId,
+        createContextEntry('assistant', `Loaded system app revision ${revision.revision}.`)
+      );
+      this.eventBus.publish({
+        type: 'window-ready',
+        sessionId: input.sessionId,
+        windowId: input.windowId,
+        appId: input.appId,
+        title: input.title,
+        status: 'ready',
+        revision: revision.revision,
+        strategy: 'remount'
+      });
+
+      return {
+        sessionId: input.sessionId,
+        windowId: input.windowId,
+        appId: windowRecord.appId,
+        title: windowRecord.title,
+        status: windowRecord.status,
+        revision: revision.revision
+      };
+    }
+
     this.eventBus.publish({
       type: 'window-status',
       sessionId: input.sessionId,
@@ -283,13 +320,7 @@ export default function WindowApp() {
 
     const prompt = buildGenerationPrompt(request);
     try {
-      const systemSource = getSystemModuleSource(record.appId);
-      const generated = systemSource
-        ? {
-            source: systemSource,
-            backend: 'system'
-          }
-        : await createLlmProvider(this.readConfig()).generate(request);
+      const generated = await createLlmProvider(this.readConfig()).generate(request);
       const validation = await validateGeneratedSource(generated.source);
       if (!validation.valid) {
         throw new Error(validation.issues.join('; '));

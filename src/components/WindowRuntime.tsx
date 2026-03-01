@@ -8,6 +8,7 @@ import {
   useRef,
   useState
 } from 'react';
+import { getAppDefinition } from '../app-catalog';
 import { getWindowModuleId } from '../runtime/module-id';
 import type {
   DesktopWindow,
@@ -31,6 +32,7 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
   const [moduleComponent, setModuleComponent] = useState<ComponentType<WindowModuleProps> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadedRevisionRef = useRef(0);
+  const isSystemApp = getAppDefinition(windowItem.appId)?.kind === 'system';
   const moduleId = useMemo(
     () => getWindowModuleId(windowItem.sessionId, windowItem.windowId),
     [windowItem.sessionId, windowItem.windowId]
@@ -84,7 +86,11 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
   ]);
 
   if (windowItem.status === 'loading') {
-    return <RuntimeFallback>Generating {windowItem.title}...</RuntimeFallback>;
+    return (
+      <RuntimeFallback>
+        {isSystemApp ? `Opening ${windowItem.title}...` : `Generating ${windowItem.title}...`}
+      </RuntimeFallback>
+    );
   }
 
   if (windowItem.status === 'error') {
