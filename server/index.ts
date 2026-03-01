@@ -23,11 +23,13 @@ async function startServer() {
     orchestrator.publishSessionEvent(event);
   }, () => preferenceConfigStore.getConfig());
   const windowPlugin = createWindowModulePlugin(orchestrator);
+  const disableHmr = process.env.AIONIOS_DISABLE_HMR === '1';
   const vite = await createViteServer({
     plugins: [windowPlugin],
     appType: 'custom',
     server: {
-      middlewareMode: true
+      middlewareMode: true,
+      hmr: disableHmr ? false : undefined
     }
   });
 
