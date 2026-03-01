@@ -607,7 +607,10 @@ export default function App() {
   return (
     <div className="desktop-shell">
       <div className="desktop-shell__workspace">
-        <DesktopIcons apps={APP_CATALOG} onOpenApp={openApp} />
+        <div className="desktop-shell__items">
+          <DesktopIcons apps={APP_CATALOG} onOpenApp={openApp} />
+          <FilePanel files={files} />
+        </div>
         <section className="window-canvas">
           {orderedWindows.map((windowItem) => {
             if (windowItem.minimized) {
@@ -729,7 +732,6 @@ export default function App() {
             );
           })}
         </section>
-        <FilePanel files={files} />
       </div>
       <Taskbar
         windows={orderedWindows}

@@ -140,7 +140,7 @@ async function main() {
   }
 
   cdpClient = await CDP({ target, port: 9222 });
-  const { Page, Runtime } = cdpClient;
+  const { Page, Runtime, Input } = cdpClient;
   await Page.enable();
   await Runtime.enable();
 
@@ -176,9 +176,134 @@ async function main() {
           Runtime,
           "document.querySelectorAll('.desktop-icon').length >= 1 && document.querySelector('.taskbar') !== null && document.querySelector('.desktop-shell') !== null"
         )
-      ),
+    ),
     'Desktop shell did not stabilize after dependency warm-up'
   );
+
+  const terminalIconBeforeDrag = await evaluate(
+    Runtime,
+    `(() => {
+      const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal'));
+      const desktopIcons = document.querySelector('.desktop-icons');
+      const workspace = document.querySelector('.desktop-shell__workspace');
+      const filePanel = document.querySelector('.file-panel');
+      if (
+        !(icon instanceof HTMLElement) ||
+        !(desktopIcons instanceof HTMLElement) ||
+        !(workspace instanceof HTMLElement) ||
+        !(filePanel instanceof HTMLElement)
+      ) {
+        return null;
+      }
+      const iconRect = icon.getBoundingClientRect();
+      const desktopRect = desktopIcons.getBoundingClientRect();
+      const workspaceRect = workspace.getBoundingClientRect();
+      const filePanelRect = filePanel.getBoundingClientRect();
+      const relativeLeft = iconRect.left - desktopRect.left;
+      const relativeTop = iconRect.top - desktopRect.top;
+      const maxShiftRight = Math.max(0, desktopRect.width - relativeLeft - iconRect.width);
+      const maxShiftDown = Math.max(0, desktopRect.height - relativeTop - iconRect.height);
+      return {
+        iconLeft: Math.round(iconRect.left),
+        iconTop: Math.round(iconRect.top),
+        iconCenterX: Math.round(iconRect.left + iconRect.width / 2),
+        iconCenterY: Math.round(iconRect.top + iconRect.height / 2),
+        iconWidth: Math.round(iconRect.width),
+        iconHeight: Math.round(iconRect.height),
+        desktopWidth: Math.round(desktopRect.width),
+        desktopHeight: Math.round(desktopRect.height),
+        workspaceWidth: Math.round(workspaceRect.width),
+        workspaceHeight: Math.round(workspaceRect.height),
+        filePanelHeight: Math.round(filePanelRect.height),
+        maxShiftRight: Math.round(maxShiftRight),
+        maxShiftDown: Math.round(maxShiftDown)
+      };
+    })()`
+  );
+  if (!terminalIconBeforeDrag) {
+    throw new Error('Terminal icon metrics are unavailable before drag check');
+  }
+
+  const dragDeltaX = Math.max(40, Math.min(260, Math.floor(terminalIconBeforeDrag.maxShiftRight * 0.75)));
+  const dragDeltaY = Math.max(40, Math.min(260, Math.floor(terminalIconBeforeDrag.maxShiftDown * 0.75)));
+  const dragEndX = terminalIconBeforeDrag.iconCenterX + dragDeltaX;
+  const dragEndY = terminalIconBeforeDrag.iconCenterY + dragDeltaY;
+  await Input.dispatchMouseEvent({
+    type: 'mouseMoved',
+    x: terminalIconBeforeDrag.iconCenterX,
+    y: terminalIconBeforeDrag.iconCenterY,
+    button: 'none'
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mousePressed',
+    x: terminalIconBeforeDrag.iconCenterX,
+    y: terminalIconBeforeDrag.iconCenterY,
+    button: 'left',
+    clickCount: 1
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mouseMoved',
+    x: dragEndX,
+    y: dragEndY,
+    button: 'left'
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mouseReleased',
+    x: dragEndX,
+    y: dragEndY,
+    button: 'left',
+    clickCount: 1
+  });
+  await delay(120);
+
+  const terminalIconAfterDrag = await evaluate(
+    Runtime,
+    `(() => {
+      const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal'));
+      if (!(icon instanceof HTMLElement)) {
+        return null;
+      }
+      const iconRect = icon.getBoundingClientRect();
+      return {
+        iconLeft: Math.round(iconRect.left),
+        iconTop: Math.round(iconRect.top)
+      };
+    })()`
+  );
+  if (!terminalIconAfterDrag) {
+    throw new Error('Terminal icon metrics are unavailable after drag check');
+  }
+
+  const horizontalShift = terminalIconAfterDrag.iconLeft - terminalIconBeforeDrag.iconLeft;
+  const verticalShift = terminalIconAfterDrag.iconTop - terminalIconBeforeDrag.iconTop;
+  const minimumExpectedHorizontalShift = Math.max(24, Math.floor(dragDeltaX * 0.5));
+  const minimumExpectedVerticalShift = Math.max(24, Math.floor(dragDeltaY * 0.5));
+  if (terminalIconBeforeDrag.desktopWidth < Math.floor(terminalIconBeforeDrag.workspaceWidth * 0.7)) {
+    throw new Error(
+      `Desktop icon layer is too narrow (${terminalIconBeforeDrag.desktopWidth}px vs workspace ${terminalIconBeforeDrag.workspaceWidth}px)`
+    );
+  }
+  if (terminalIconBeforeDrag.desktopHeight < Math.floor(terminalIconBeforeDrag.workspaceHeight * 0.7)) {
+    throw new Error(
+      `Desktop icon layer is too short (${terminalIconBeforeDrag.desktopHeight}px vs workspace ${terminalIconBeforeDrag.workspaceHeight}px)`
+    );
+  }
+  if (terminalIconBeforeDrag.filePanelHeight < Math.floor(terminalIconBeforeDrag.workspaceHeight * 0.8)) {
+    throw new Error(
+      `Host Files panel height is too short (${terminalIconBeforeDrag.filePanelHeight}px vs workspace ${terminalIconBeforeDrag.workspaceHeight}px)`
+    );
+  }
+  if (horizontalShift < minimumExpectedHorizontalShift) {
+    throw new Error(
+      `Terminal icon horizontal drag shift too small (${horizontalShift}px, expected at least ${minimumExpectedHorizontalShift}px)`
+    );
+  }
+  if (verticalShift < minimumExpectedVerticalShift) {
+    throw new Error(
+      `Terminal icon vertical drag shift too small (${verticalShift}px, expected at least ${minimumExpectedVerticalShift}px)`
+    );
+  }
+  await delay(300);
 
   const opened = await evaluate(
     Runtime,
