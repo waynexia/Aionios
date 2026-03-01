@@ -1,12 +1,12 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import CDP from 'chrome-remote-interface';
 
-const SERVER_URL = 'http://localhost:5173';
 const DEBUG_URL = 'http://localhost:9222/json';
 const VERIFY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 400;
@@ -21,6 +21,31 @@ const DIRECTORY_DRAFT_CONTENT = '# Directory CDP check\nCreated by verify:cdp.';
 const MEDIA_SOURCE_DATA_URL =
   'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=';
 const EDITOR_MARKER = 'CDP_EDITOR_MARKER_20260301';
+
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.unref();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('Unable to resolve an available TCP port.')));
+        return;
+      }
+      server.close((error) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(address.port);
+      });
+    });
+  });
+}
+
+const serverPort = await getFreePort();
+const SERVER_URL = `http://localhost:${String(serverPort)}`;
 
 const tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'aionios-cdp-'));
 const logDir = path.join(tmpDir, 'logs');
@@ -89,6 +114,7 @@ async function main() {
     cwd: process.cwd(),
     env: {
       ...process.env,
+      PORT: String(serverPort),
       AIONIOS_CONFIG_PATH: configPath,
       AIONIOS_LLM_BACKEND: 'mock'
     },
@@ -134,9 +160,9 @@ async function main() {
   }, 'Chrome remote debugging endpoint is not available');
 
   const targets = await fetchJson(DEBUG_URL);
-  const target = targets.find((item) => String(item.url ?? '').includes('localhost:5173'));
+  const target = targets.find((item) => String(item.url ?? '').includes(`localhost:${String(serverPort)}`));
   if (!target) {
-    throw new Error('Cannot find target page for localhost:5173 from Chrome remote debugging list');
+    throw new Error(`Cannot find target page for ${SERVER_URL} from Chrome remote debugging list`);
   }
 
   cdpClient = await CDP({ target, port: 9222 });
@@ -187,6 +213,130 @@ async function main() {
         )
     ),
     'Desktop shell did not stabilize after dependency warm-up'
+  );
+
+  const contextMenuAnchor = await evaluate(
+    Runtime,
+    `(() => {
+      const workspace = document.querySelector('.desktop-shell__workspace');
+      if (!(workspace instanceof HTMLElement)) {
+        return null;
+      }
+      const rect = workspace.getBoundingClientRect();
+      return {
+        x: Math.round(rect.left + rect.width - 30),
+        y: Math.round(rect.top + rect.height - 30)
+      };
+    })()`
+  );
+  if (!contextMenuAnchor) {
+    throw new Error('Desktop workspace metrics are unavailable for context menu check');
+  }
+
+  await Input.dispatchMouseEvent({
+    type: 'mouseMoved',
+    x: contextMenuAnchor.x,
+    y: contextMenuAnchor.y,
+    button: 'none'
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mousePressed',
+    x: contextMenuAnchor.x,
+    y: contextMenuAnchor.y,
+    button: 'right',
+    clickCount: 1
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mouseReleased',
+    x: contextMenuAnchor.x,
+    y: contextMenuAnchor.y,
+    button: 'right',
+    clickCount: 1
+  });
+
+  await waitFor(
+    async () =>
+      Boolean(await evaluate(Runtime, "document.querySelector('[data-context-menu]') instanceof HTMLElement")),
+    'Desktop context menu did not open'
+  );
+
+  const contextMenuLabels = await evaluate(
+    Runtime,
+    `(() => Array.from(document.querySelectorAll('[data-context-menu-item]')).map((item) => item.textContent?.trim() ?? ''))()`
+  );
+  if (!Array.isArray(contextMenuLabels) || contextMenuLabels.join('|') !== 'Refresh|Create|Delete') {
+    throw new Error(`Unexpected context menu items: ${JSON.stringify(contextMenuLabels)}`);
+  }
+
+  await evaluate(
+    Runtime,
+    "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));"
+  );
+  await waitFor(
+    async () => Boolean(await evaluate(Runtime, "document.querySelector('[data-context-menu]') === null")),
+    'Desktop context menu did not close after Escape key'
+  );
+
+  const terminalIconAnchor = await evaluate(
+    Runtime,
+    `(() => {
+      const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal'));
+      if (!(icon instanceof HTMLElement)) {
+        return null;
+      }
+      const rect = icon.getBoundingClientRect();
+      return {
+        x: Math.round(rect.left + rect.width / 2),
+        y: Math.round(rect.top + rect.height / 2)
+      };
+    })()`
+  );
+  if (!terminalIconAnchor) {
+    throw new Error('Terminal icon metrics are unavailable for right-click selection check');
+  }
+
+  await Input.dispatchMouseEvent({
+    type: 'mouseMoved',
+    x: terminalIconAnchor.x,
+    y: terminalIconAnchor.y,
+    button: 'none'
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mousePressed',
+    x: terminalIconAnchor.x,
+    y: terminalIconAnchor.y,
+    button: 'right',
+    clickCount: 1
+  });
+  await Input.dispatchMouseEvent({
+    type: 'mouseReleased',
+    x: terminalIconAnchor.x,
+    y: terminalIconAnchor.y,
+    button: 'right',
+    clickCount: 1
+  });
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal'));
+            return icon instanceof HTMLElement && icon.classList.contains('desktop-icon--selected');
+          })()`
+        )
+      ),
+    'Desktop icon did not become selected after right click'
+  );
+
+  await evaluate(
+    Runtime,
+    "window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));"
+  );
+  await waitFor(
+    async () => Boolean(await evaluate(Runtime, "document.querySelector('[data-context-menu]') === null")),
+    'Desktop context menu did not close after icon right-click selection check'
   );
 
   const terminalSelected = await evaluate(

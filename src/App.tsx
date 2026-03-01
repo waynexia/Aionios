@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   closeWindow,
   createSession,
@@ -11,6 +11,7 @@ import {
   updatePreferenceConfig
 } from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
+import { ContextMenu } from './components/ContextMenu';
 import { DesktopIcons } from './components/DesktopIcons';
 import { Taskbar } from './components/Taskbar';
 import { WindowFrame } from './components/WindowFrame';
@@ -150,6 +151,13 @@ function clamp(value: number, min: number, max: number) {
     return max;
   }
   return value;
+}
+
+function shouldKeepNativeContextMenu(target: EventTarget | null) {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(target.closest('input, textarea, select, option, [contenteditable], .xterm'));
 }
 
 function createInitialWindowBounds(
@@ -421,6 +429,7 @@ export default function App() {
   const filesRef = useRef(state.files);
   const sessionRef = useRef(state.sessionId);
   const windowCanvasRef = useRef<HTMLElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     filesRef.current = state.files;
@@ -635,6 +644,19 @@ export default function App() {
     [state.windows]
   );
 
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const contextMenuItems = useMemo(
+    () => [
+      { id: 'refresh', label: 'Refresh' },
+      { id: 'create', label: 'Create', disabled: true },
+      { id: 'delete', label: 'Delete', disabled: true }
+    ],
+    []
+  );
+
   if (state.bootError) {
     return <div className="booting-shell">Unable to boot desktop: {state.bootError}</div>;
   }
@@ -646,7 +668,17 @@ export default function App() {
   }
 
   return (
-    <div className="desktop-shell">
+    <div
+      className="desktop-shell"
+      onContextMenu={(event) => {
+        if (event.shiftKey || shouldKeepNativeContextMenu(event.target)) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        setContextMenu({ x: event.clientX, y: event.clientY });
+      }}
+    >
       <div className="desktop-shell__workspace">
         <div className="desktop-shell__items">
           <DesktopIcons apps={APP_CATALOG} onOpenApp={openApp} />
@@ -792,6 +824,13 @@ export default function App() {
             windowId
           });
         }}
+      />
+      <ContextMenu
+        open={Boolean(contextMenu)}
+        x={contextMenu?.x ?? 0}
+        y={contextMenu?.y ?? 0}
+        items={contextMenuItems}
+        onClose={closeContextMenu}
       />
     </div>
   );

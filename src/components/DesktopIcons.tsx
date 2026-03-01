@@ -213,6 +213,10 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     onOpenApp(appId);
   };
 
+  const onIconContextMenu = (appId: string) => {
+    setSelectedAppId(appId);
+  };
+
   return (
     <section
       ref={containerRef}
@@ -240,6 +244,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
             onPointerCancel={(event) => onIconPointerEnd(event, app.appId)}
             onClick={(event) => onIconClick(event, app.appId)}
             onDoubleClick={(event) => onIconDoubleClick(event, app.appId)}
+            onContextMenu={() => onIconContextMenu(app.appId)}
             title={`${app.title} — ${app.hint}`}
           >
             <span className="desktop-icon__emoji">{app.icon}</span>
