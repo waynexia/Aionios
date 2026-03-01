@@ -10,10 +10,22 @@ const SERVER_URL = 'http://localhost:5173';
 const DEBUG_URL = 'http://localhost:9222/json';
 const VERIFY_TIMEOUT_MS = 60_000;
 const POLL_INTERVAL_MS = 400;
+const PREFERENCE_EXPECTED = {
+  llmBackend: 'codex',
+  codexCommand: 'codex exec --model gpt-5 --output-last-message',
+  codexTimeoutMs: 54321,
+  terminalShell: '/bin/sh'
+};
+const DIRECTORY_DRAFT_PATH = 'notes/cdp-system-app-check.md';
+const DIRECTORY_DRAFT_CONTENT = '# Directory CDP check\nCreated by verify:cdp.';
+const MEDIA_SOURCE_DATA_URL =
+  'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=';
+const EDITOR_MARKER = 'CDP_EDITOR_MARKER_20260301';
 
 const tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'aionios-cdp-'));
 const logDir = path.join(tmpDir, 'logs');
 const chromeProfileDir = path.join(tmpDir, 'chrome-profile');
+const configPath = path.join(tmpDir, 'preferences.toml');
 await fsPromises.mkdir(logDir, { recursive: true });
 await fsPromises.mkdir(chromeProfileDir, { recursive: true });
 
@@ -75,6 +87,11 @@ async function main() {
   console.log('[verify:cdp] temp dir:', tmpDir);
   devServer = spawn('npm', ['run', 'dev'], {
     cwd: process.cwd(),
+    env: {
+      ...process.env,
+      AIONIOS_CONFIG_PATH: configPath,
+      AIONIOS_LLM_BACKEND: 'mock'
+    },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   streamProcessOutput(devServer, path.join(logDir, 'dev-server.log'), 'dev-server');
@@ -146,6 +163,23 @@ async function main() {
     throw new Error('No desktop apps found to open');
   }
 
+  try {
+    await evaluate(Runtime, "import('shiki').then(() => true).catch(() => false)");
+  } catch {
+    // Vite may reload after first dependency optimization; re-check shell below.
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          "document.querySelectorAll('.desktop-icon').length >= 1 && document.querySelector('.taskbar') !== null && document.querySelector('.desktop-shell') !== null"
+        )
+      ),
+    'Desktop shell did not stabilize after dependency warm-up'
+  );
+
   const opened = await evaluate(
     Runtime,
     "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal')); if (!icon) return false; icon.click(); return true; })()"
@@ -208,11 +242,399 @@ async function main() {
     'Terminal command execution did not produce expected host output'
   );
 
+  const openedPreference = await evaluate(
+    Runtime,
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Preference')); if (!icon) return false; icon.click(); return true; })()"
+  );
+  if (!openedPreference) {
+    throw new Error('Failed to click Preference app icon');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          "document.querySelector('.window-frame[data-app-id=\"preference\"] [data-pref-form]') instanceof HTMLElement"
+        )
+      ),
+    'Preference form did not render'
+  );
+
+  const preferenceEdited = await evaluate(
+    Runtime,
+    `(() => {
+      const frame = document.querySelector('.window-frame[data-app-id="preference"]');
+      if (!(frame instanceof HTMLElement)) return false;
+      const backend = frame.querySelector('[data-pref-field="llm-backend"]');
+      const command = frame.querySelector('[data-pref-field="codex-command"]');
+      const timeout = frame.querySelector('[data-pref-field="codex-timeout-ms"]');
+      const shell = frame.querySelector('[data-pref-field="terminal-shell"]');
+      const submit = frame.querySelector('[data-pref-action="save"]');
+      if (!(backend instanceof HTMLSelectElement)) return false;
+      if (!(command instanceof HTMLInputElement)) return false;
+      if (!(timeout instanceof HTMLInputElement)) return false;
+      if (!(shell instanceof HTMLInputElement)) return false;
+      if (!(submit instanceof HTMLButtonElement)) return false;
+      const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      const selectValueSetter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      if (!inputValueSetter || !selectValueSetter) return false;
+      selectValueSetter.call(backend, ${JSON.stringify(PREFERENCE_EXPECTED.llmBackend)});
+      backend.dispatchEvent(new Event('change', { bubbles: true }));
+      inputValueSetter.call(command, ${JSON.stringify(PREFERENCE_EXPECTED.codexCommand)});
+      command.dispatchEvent(new Event('input', { bubbles: true }));
+      inputValueSetter.call(timeout, ${JSON.stringify(String(PREFERENCE_EXPECTED.codexTimeoutMs))});
+      timeout.dispatchEvent(new Event('input', { bubbles: true }));
+      inputValueSetter.call(shell, ${JSON.stringify(PREFERENCE_EXPECTED.terminalShell)});
+      shell.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`
+  );
+  if (!preferenceEdited) {
+    throw new Error('Unable to edit Preference fields through Preference app');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="preference"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            const command = frame.querySelector('[data-pref-field="codex-command"]');
+            const timeout = frame.querySelector('[data-pref-field="codex-timeout-ms"]');
+            const shell = frame.querySelector('[data-pref-field="terminal-shell"]');
+            if (!(command instanceof HTMLInputElement)) return false;
+            if (!(timeout instanceof HTMLInputElement)) return false;
+            if (!(shell instanceof HTMLInputElement)) return false;
+            return command.value === ${JSON.stringify(PREFERENCE_EXPECTED.codexCommand)} &&
+              timeout.value === ${JSON.stringify(String(PREFERENCE_EXPECTED.codexTimeoutMs))} &&
+              shell.value === ${JSON.stringify(PREFERENCE_EXPECTED.terminalShell)};
+          })()`
+        )
+      ),
+    'Preference form fields were not updated'
+  );
+
+  const preferenceSubmitted = await evaluate(
+    Runtime,
+    `(() => {
+      const button = document.querySelector('.window-frame[data-app-id="preference"] [data-pref-action="save"]');
+      if (!(button instanceof HTMLButtonElement)) return false;
+      button.click();
+      return true;
+    })()`
+  );
+  if (!preferenceSubmitted) {
+    throw new Error('Unable to submit Preference form');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          "(() => (document.querySelector('.window-frame[data-app-id=\"preference\"] [data-pref-status]')?.textContent ?? '').includes('Preferences saved.'))()"
+        )
+      ),
+    'Preference save did not complete'
+  );
+
+  const persistedConfig = await fetchJson(`${SERVER_URL}/api/config`);
+  if (
+    persistedConfig.llmBackend !== PREFERENCE_EXPECTED.llmBackend ||
+    persistedConfig.codexCommand !== PREFERENCE_EXPECTED.codexCommand ||
+    persistedConfig.codexTimeoutMs !== PREFERENCE_EXPECTED.codexTimeoutMs ||
+    persistedConfig.terminalShell !== PREFERENCE_EXPECTED.terminalShell
+  ) {
+    throw new Error(
+      `Preference API values mismatch: ${JSON.stringify(persistedConfig)}`
+    );
+  }
+
+  const persistedToml = await fsPromises.readFile(configPath, 'utf8');
+  const hasTimeout = /codex_timeout_ms\s*=\s*(54_321|54321)/.test(persistedToml);
+  if (
+    !persistedToml.includes('backend = "codex"') ||
+    !hasTimeout ||
+    !persistedToml.includes('shell = "/bin/sh"')
+  ) {
+    throw new Error('Preference config file does not contain expected persisted values');
+  }
+
+  const openedDirectory = await evaluate(
+    Runtime,
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Directory')); if (!icon) return false; icon.click(); return true; })()"
+  );
+  if (!openedDirectory) {
+    throw new Error('Failed to click Directory app icon');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="directory"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            return frame.querySelector('[data-directory-app]') instanceof HTMLElement &&
+              frame.querySelector('[data-directory-list]') instanceof HTMLElement &&
+              frame.querySelector('[data-directory-selected]') instanceof HTMLElement &&
+              frame.querySelector('[data-directory-save]') instanceof HTMLButtonElement;
+          })()`
+        )
+      ),
+    'Directory app root/hooks did not render'
+  );
+
+  const directoryEdited = await evaluate(
+    Runtime,
+    `(() => {
+      const frame = document.querySelector('.window-frame[data-app-id="directory"]');
+      if (!(frame instanceof HTMLElement)) return false;
+      const pathInput = frame.querySelector('input');
+      const contentInput = frame.querySelector('textarea');
+      const saveButton = frame.querySelector('[data-directory-save]');
+      if (!(pathInput instanceof HTMLInputElement)) return false;
+      if (!(contentInput instanceof HTMLTextAreaElement)) return false;
+      if (!(saveButton instanceof HTMLButtonElement)) return false;
+      const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      const textareaValueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      if (!inputValueSetter || !textareaValueSetter) return false;
+      inputValueSetter.call(pathInput, ${JSON.stringify(DIRECTORY_DRAFT_PATH)});
+      pathInput.dispatchEvent(new Event('input', { bubbles: true }));
+      textareaValueSetter.call(contentInput, ${JSON.stringify(DIRECTORY_DRAFT_CONTENT)});
+      contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+      saveButton.click();
+      return true;
+    })()`
+  );
+  if (!directoryEdited) {
+    throw new Error('Unable to create/save a draft in Directory app');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="directory"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            const selectedPath = frame.querySelector('[data-directory-selected]')?.textContent?.trim() ?? '';
+            const listButtons = Array.from(frame.querySelectorAll('[data-directory-list] button'));
+            const hasSavedEntry = listButtons.some(
+              (button) => button.textContent?.trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)}
+            );
+            const draftContent = frame.querySelector('textarea')?.value ?? '';
+            return selectedPath === ${JSON.stringify(DIRECTORY_DRAFT_PATH)} &&
+              hasSavedEntry &&
+              draftContent.includes(${JSON.stringify('Created by verify:cdp.')});
+          })()`
+        )
+      ),
+    'Directory save did not update UI state as expected'
+  );
+
+  const openedMedia = await evaluate(
+    Runtime,
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Media')); if (!icon) return false; icon.click(); return true; })()"
+  );
+  if (!openedMedia) {
+    throw new Error('Failed to click Media app icon');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="media"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            return frame.querySelector('[data-media-app]') instanceof HTMLElement &&
+              frame.querySelector('[data-media-source]') instanceof HTMLInputElement &&
+              frame.querySelector('[data-media-load]') instanceof HTMLButtonElement &&
+              frame.querySelector('[data-media-player]') instanceof HTMLElement;
+          })()`
+        )
+      ),
+    'Media app root/hooks did not render'
+  );
+
+  const mediaLoaded = await evaluate(
+    Runtime,
+    `(() => {
+      const frame = document.querySelector('.window-frame[data-app-id="media"]');
+      if (!(frame instanceof HTMLElement)) return false;
+      const sourceInput = frame.querySelector('[data-media-source]');
+      const loadButton = frame.querySelector('[data-media-load]');
+      if (!(sourceInput instanceof HTMLInputElement)) return false;
+      if (!(loadButton instanceof HTMLButtonElement)) return false;
+      const inputValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      if (!inputValueSetter) return false;
+      inputValueSetter.call(sourceInput, ${JSON.stringify(MEDIA_SOURCE_DATA_URL)});
+      sourceInput.dispatchEvent(new Event('input', { bubbles: true }));
+      loadButton.click();
+      return true;
+    })()`
+  );
+  if (!mediaLoaded) {
+    throw new Error('Unable to load source in Media app');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const player = document.querySelector('.window-frame[data-app-id="media"] [data-media-player]');
+            if (!(player instanceof HTMLElement)) return false;
+            const image = player.querySelector('img');
+            return image instanceof HTMLImageElement && image.src.startsWith('data:image/gif');
+          })()`
+        )
+      ),
+    'Media player did not update after loading source'
+  );
+
+  const openedEditor = await evaluate(
+    Runtime,
+    "(() => { const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Editor')); if (!icon) return false; icon.click(); return true; })()"
+  );
+  if (!openedEditor) {
+    throw new Error('Failed to click Editor app icon');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="editor"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            return frame.querySelector('[data-editor-app]') instanceof HTMLElement &&
+              frame.querySelector('[data-editor-files]') instanceof HTMLElement &&
+              frame.querySelector('[data-editor-textarea]') instanceof HTMLTextAreaElement &&
+              frame.querySelector('[data-editor-save]') instanceof HTMLButtonElement &&
+              frame.querySelector('[data-editor-preview]') instanceof HTMLElement;
+          })()`
+        )
+      ),
+    'Editor app root/hooks did not render'
+  );
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="editor"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            const targetButton = Array.from(frame.querySelectorAll('[data-editor-files] button')).find(
+              (button) => button.textContent?.trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)}
+            );
+            if (!(targetButton instanceof HTMLButtonElement)) return false;
+            targetButton.click();
+            return true;
+          })()`
+        )
+      ),
+    'Editor file list did not expose saved Directory draft'
+  );
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const textarea = document.querySelector('.window-frame[data-app-id="editor"] [data-editor-textarea]');
+            return textarea instanceof HTMLTextAreaElement && textarea.value.includes('Directory CDP check');
+          })()`
+        )
+      ),
+    'Editor did not load selected file content'
+  );
+
+  const editorEdited = await evaluate(
+    Runtime,
+    `(() => {
+      const frame = document.querySelector('.window-frame[data-app-id="editor"]');
+      if (!(frame instanceof HTMLElement)) return false;
+      const textarea = frame.querySelector('[data-editor-textarea]');
+      if (!(textarea instanceof HTMLTextAreaElement)) return false;
+      const textareaValueSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      if (!textareaValueSetter) return false;
+      const nextValue = textarea.value + '\\n' + ${JSON.stringify(EDITOR_MARKER)};
+      textareaValueSetter.call(textarea, nextValue);
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()`
+  );
+  if (!editorEdited) {
+    throw new Error('Unable to edit file content in Editor app');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          "(() => { const saveButton = document.querySelector('.window-frame[data-app-id=\"editor\"] [data-editor-save]'); return saveButton instanceof HTMLButtonElement && !saveButton.disabled; })()"
+        )
+      ),
+    'Editor save button did not become enabled after edit'
+  );
+
+  const editorSaved = await evaluate(
+    Runtime,
+    `(() => {
+      const saveButton = document.querySelector('.window-frame[data-app-id="editor"] [data-editor-save]');
+      if (!(saveButton instanceof HTMLButtonElement)) return false;
+      saveButton.click();
+      return true;
+    })()`
+  );
+  if (!editorSaved) {
+    throw new Error('Unable to save edited file in Editor app');
+  }
+
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-app-id="editor"]');
+            if (!(frame instanceof HTMLElement)) return false;
+            const preview = frame.querySelector('[data-editor-preview]');
+            if (!(preview instanceof HTMLElement)) return false;
+            const statusSaved = (frame.textContent ?? '').includes(${JSON.stringify(`Saved ${DIRECTORY_DRAFT_PATH}.`)});
+            const previewText = preview.textContent ?? '';
+            const hasHighlightedMarkup =
+              preview.innerHTML.includes('class="shiki') || preview.innerHTML.includes("class='shiki");
+            return statusSaved && hasHighlightedMarkup && previewText.includes(${JSON.stringify(EDITOR_MARKER)});
+          })()`
+        )
+      ),
+    'Editor save status/preview did not reflect edited content'
+  );
+
   const finalState = await evaluate(
     Runtime,
-    "(() => ({ title: document.querySelector('.window-frame__title span')?.textContent ?? '', status: document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '', windows: document.querySelectorAll('.window-frame').length, icons: document.querySelectorAll('.desktop-icon').length }))()"
+    "(() => ({ windows: document.querySelectorAll('.window-frame').length, icons: document.querySelectorAll('.desktop-icon').length, preferenceStatus: document.querySelector('.window-frame[data-app-id=\"preference\"] [data-pref-status]')?.textContent?.trim() ?? '' }))()"
   );
+  if (finalState.windows < 2 || finalState.icons < 2) {
+    throw new Error(`Unexpected final desktop state: ${JSON.stringify(finalState)}`);
+  }
   console.log('[verify:cdp] success:', finalState);
+  console.log('[verify:cdp] config path:', configPath);
   console.log('[verify:cdp] logs:', logDir);
 }
 
