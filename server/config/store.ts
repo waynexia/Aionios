@@ -195,7 +195,7 @@ function resolveEnvCodexCommand(environment: NodeJS.ProcessEnv): string {
 }
 
 function resolveEnvShell(environment: NodeJS.ProcessEnv): string {
-  const configured = environment.AIONIOS_TERMINAL_SHELL?.trim();
+  const configured = environment.SHELL?.trim();
   if (configured && configured.length > 0) {
     return configured;
   }
@@ -211,7 +211,7 @@ function resolveEnvShell(environment: NodeJS.ProcessEnv): string {
     }
   }
 
-  return environment.SHELL?.trim() || 'sh';
+  return 'sh';
 }
 
 export function resolvePreferenceDefaults(

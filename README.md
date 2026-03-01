@@ -36,7 +36,7 @@ Then open `http://localhost:5173`.
   - `codexCommand`
   - `codexTimeoutMs`
   - `terminalShell`
-- Environment variables (`AIONIOS_LLM_BACKEND`, `AIONIOS_CODEX_COMMAND`, `AIONIOS_CODEX_TIMEOUT_MS`, `AIONIOS_TERMINAL_SHELL`) are used as initial defaults when no config file exists.
+- Environment variables (`AIONIOS_LLM_BACKEND`, `AIONIOS_CODEX_COMMAND`, `AIONIOS_CODEX_TIMEOUT_MS`) are used as initial defaults when no config file exists. (`terminalShell` seeds from `$SHELL` when present.)
 - Codex backend can still be bootstrapped via env defaults:
 
 ```bash

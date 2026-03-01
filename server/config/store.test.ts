@@ -133,7 +133,7 @@ describe('resolvePreferenceDefaults', () => {
       AIONIOS_LLM_BACKEND: 'CoDeX',
       AIONIOS_CODEX_COMMAND: 'codex exec --model gpt-5',
       AIONIOS_CODEX_TIMEOUT_MS: '90000',
-      AIONIOS_TERMINAL_SHELL: '/usr/bin/fish'
+      SHELL: '/usr/bin/fish'
     });
     expect(resolved).toEqual({
       llmBackend: 'codex',
