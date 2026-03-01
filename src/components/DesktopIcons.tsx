@@ -234,6 +234,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
           <button
             key={app.appId}
             className={`desktop-icon${isSelected ? ' desktop-icon--selected' : ''}`}
+            data-app-id={app.appId}
             style={{
               left: `${position.x}px`,
               top: `${position.y}px`

@@ -55,10 +55,14 @@ export function Taskbar({ windows, focusedWindowId, onWindowClick }: TaskbarProp
             className={`taskbar__window ${
               windowItem.windowId === focusedWindowId ? 'taskbar__window--active' : ''
             }`}
+            data-window-id={windowItem.windowId}
+            data-app-id={windowItem.appId}
             onClick={() => onWindowClick(windowItem.windowId)}
           >
             <span>{windowItem.title}</span>
-            <span className="taskbar__status">{windowItem.status}</span>
+            <span className="taskbar__status" data-taskbar-status>
+              {windowItem.status}
+            </span>
           </button>
         ))}
       </div>

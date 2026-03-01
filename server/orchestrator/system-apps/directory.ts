@@ -285,6 +285,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
             <span>Path</span>
             <input
+              data-directory-path
               value={draftPath}
               disabled={saving}
               onChange={(event) => setDraftPath(event.target.value)}
@@ -301,6 +302,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           <label style={{ display: 'grid', gap: 4, fontSize: 12, minHeight: 0 }}>
             <span>Preview / Editor</span>
             <textarea
+              data-directory-content
               value={draftContent}
               disabled={saving || loadingFile}
               onChange={(event) => setDraftContent(event.target.value)}
