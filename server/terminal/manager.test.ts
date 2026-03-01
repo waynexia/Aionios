@@ -1,11 +1,8 @@
-import { EventEmitter } from 'node:events';
-import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { PassThrough } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { IPty } from 'node-pty';
 import type { PreferenceConfig } from '../config';
 import type {
   TerminalExitEvent,
-  TerminalOutputEvent,
   TerminalStatusEvent
 } from '../orchestrator/types';
 
@@ -13,13 +10,13 @@ const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn()
 }));
 
-vi.mock('node:child_process', () => ({
+vi.mock('node-pty', () => ({
   spawn: spawnMock
 }));
 
 import { TerminalManager } from './manager';
 
-type TerminalEvent = TerminalStatusEvent | TerminalOutputEvent | TerminalExitEvent;
+type TerminalEvent = TerminalStatusEvent | TerminalExitEvent;
 const preferenceConfig: PreferenceConfig = {
   llmBackend: 'mock',
   codexCommand: 'codex exec --skip-git-repo-check --output-last-message',
@@ -27,49 +24,46 @@ const preferenceConfig: PreferenceConfig = {
   terminalShell: '/bin/bash'
 };
 
-function createMockChildProcess(pid = 1001) {
-  const child = new EventEmitter() as ChildProcessWithoutNullStreams;
-
-  Object.defineProperties(child, {
-    stdin: {
-      value: new PassThrough() as ChildProcessWithoutNullStreams['stdin'],
-      writable: true
-    },
-    stdout: {
-      value: new PassThrough() as ChildProcessWithoutNullStreams['stdout'],
-      writable: true
-    },
-    stderr: {
-      value: new PassThrough() as ChildProcessWithoutNullStreams['stderr'],
-      writable: true
-    },
-    pid: {
-      value: pid,
-      writable: true
-    },
-    killed: {
-      value: false,
-      writable: true
-    },
-    exitCode: {
-      value: null,
-      writable: true
-    },
-    signalCode: {
-      value: null,
-      writable: true
+function createEvent<T>() {
+  const listeners = new Set<(data: T) => void>();
+  const event = (listener: (data: T) => void) => {
+    listeners.add(listener);
+    return {
+      dispose: () => listeners.delete(listener)
+    };
+  };
+  const fire = (data: T) => {
+    for (const listener of listeners) {
+      listener(data);
     }
-  });
+  };
+  return { event, fire };
+}
 
-  child.kill = vi.fn((signal?: NodeJS.Signals | number) => {
-    if (signal === 'SIGTERM') {
-      Reflect.set(child as object, 'killed', true);
-      return true;
-    }
-    return false;
-  }) as ChildProcessWithoutNullStreams['kill'];
-
-  return child;
+function createMockPty(pid = 1001) {
+  const dataEvent = createEvent<string>();
+  const exitEvent = createEvent<{ exitCode: number; signal?: number }>();
+  const runtime: IPty & {
+    __fireData: (chunk: string) => void;
+    __fireExit: (payload: { exitCode: number; signal?: number }) => void;
+  } = {
+    pid,
+    cols: 80,
+    rows: 24,
+    process: 'shell',
+    handleFlowControl: false,
+    onData: dataEvent.event,
+    onExit: exitEvent.event,
+    resize: vi.fn(),
+    clear: vi.fn(),
+    write: vi.fn(),
+    kill: vi.fn(),
+    pause: vi.fn(),
+    resume: vi.fn(),
+    __fireData: dataEvent.fire,
+    __fireExit: exitEvent.fire
+  };
+  return runtime;
 }
 
 describe('TerminalManager', () => {
@@ -78,41 +72,29 @@ describe('TerminalManager', () => {
   });
 
   it('emits starting then running status when a session starts', () => {
-    const child = createMockChildProcess();
-    spawnMock.mockReturnValue(child);
+    const terminal = createMockPty();
+    spawnMock.mockReturnValue(terminal);
     const events: TerminalEvent[] = [];
     const manager = new TerminalManager((event) => events.push(event), () => preferenceConfig);
 
     const metadata = manager.start('session-a', 'window-1');
 
     expect(metadata.status).toBe('running');
+    expect(metadata.cols).toBe(80);
+    expect(metadata.rows).toBe(24);
     const statusEvents = events.filter((event) => event.type === 'terminal-status');
     expect(statusEvents.map((event) => event.status)).toEqual(['starting', 'running']);
   });
 
-  it('cleans up session after child close', () => {
-    const child = createMockChildProcess();
-    spawnMock.mockReturnValue(child);
+  it('cleans up session after terminal exit', () => {
+    const terminal = createMockPty();
+    spawnMock.mockReturnValue(terminal);
     const manager = new TerminalManager(() => {}, () => preferenceConfig);
 
     manager.start('session-a', 'window-1');
-    child.emit('close', 0, null);
+    terminal.__fireExit({ exitCode: 0 });
 
     expect(() => manager.write('session-a', 'window-1', 'pwd\n')).toThrow(
-      'Terminal session is not running.'
-    );
-    expect(manager.close('session-a', 'window-1')).toBe(false);
-  });
-
-  it('cleans up session when child emits error', () => {
-    const child = createMockChildProcess();
-    spawnMock.mockReturnValue(child);
-    const manager = new TerminalManager(() => {}, () => preferenceConfig);
-
-    manager.start('session-a', 'window-1');
-    child.emit('error', new Error('spawn failed'));
-
-    expect(() => manager.write('session-a', 'window-1', 'echo test\n')).toThrow(
       'Terminal session is not running.'
     );
     expect(manager.close('session-a', 'window-1')).toBe(false);
@@ -126,29 +108,48 @@ describe('TerminalManager', () => {
     );
   });
 
+  it('supports subscribe streaming and transcript replay', () => {
+    const terminal = createMockPty();
+    spawnMock.mockReturnValue(terminal);
+    const manager = new TerminalManager(() => {}, () => preferenceConfig);
+
+    manager.start('session-a', 'window-1');
+    terminal.__fireData('hello');
+
+    const received: string[] = [];
+    const unsubscribe = manager.subscribe('session-a', 'window-1', (chunk) => received.push(chunk));
+    expect(received.join('')).toContain('hello');
+
+    terminal.__fireData(' world');
+    expect(received.join('')).toContain('hello world');
+    unsubscribe();
+    terminal.__fireData('!');
+    expect(received.join('')).not.toContain('!');
+  });
+
   it('returns accurate close semantics for missing and closed sessions', () => {
-    const firstChild = createMockChildProcess(1001);
-    const secondChild = createMockChildProcess(1002);
-    spawnMock.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
+    const first = createMockPty(1001);
+    const second = createMockPty(1002);
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
     const manager = new TerminalManager(() => {}, () => preferenceConfig);
 
     expect(manager.close('session-a', 'window-1')).toBe(false);
 
     manager.start('session-a', 'window-1');
-    Reflect.set(firstChild as object, 'exitCode', 0);
+    first.__fireExit({ exitCode: 0 });
     expect(manager.close('session-a', 'window-1')).toBe(false);
 
     manager.start('session-a', 'window-1');
     expect(spawnMock).toHaveBeenCalledTimes(2);
     expect(manager.close('session-a', 'window-1')).toBe(true);
 
-    secondChild.emit('close', 0, null);
+    second.__fireExit({ exitCode: 0 });
     expect(manager.close('session-a', 'window-1')).toBe(false);
   });
 
   it('uses configured shell from preferences', () => {
-    const child = createMockChildProcess();
-    spawnMock.mockReturnValue(child);
+    const terminal = createMockPty();
+    spawnMock.mockReturnValue(terminal);
     const manager = new TerminalManager(() => {}, () => ({
       ...preferenceConfig,
       terminalShell: '/usr/bin/zsh'

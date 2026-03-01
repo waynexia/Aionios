@@ -169,6 +169,15 @@ async function main() {
     // Vite may reload after first dependency optimization; re-check shell below.
   }
 
+  try {
+    await evaluate(
+      Runtime,
+      "Promise.all([import('@xterm/xterm'), import('@xterm/addon-fit'), import('@xterm/addon-web-links')]).then(() => true).catch(() => false)"
+    );
+  } catch {
+    // Vite may reload after first dependency optimization; re-check shell below.
+  }
+
   await waitFor(
     async () =>
       Boolean(
@@ -324,6 +333,17 @@ async function main() {
     'Terminal window did not reach ready state after opening'
   );
 
+  await waitFor(
+    async () =>
+      Boolean(
+        await evaluate(
+          Runtime,
+          "(() => { const frame = document.querySelector('.window-frame[data-app-id=\"terminal\"]'); if (!(frame instanceof HTMLElement)) return false; const windowId = frame.dataset.windowId; const registry = globalThis.__AIONIOS_XTERM__; return Boolean(windowId && registry && registry[windowId]); })()"
+        )
+      ),
+    'Terminal xterm instance is not available'
+  );
+
   const started = await evaluate(
     Runtime,
     "(() => { const frame = document.querySelector('.window-frame[data-app-id=\"terminal\"]'); if (!(frame instanceof HTMLElement)) return false; const sessionId = frame.dataset.sessionId; const windowId = frame.dataset.windowId; if (!sessionId || !windowId) return false; return fetch(`/api/sessions/${sessionId}/windows/${windowId}/terminal/start`, { method: 'POST' }).then((response) => response.ok); })()"
@@ -331,17 +351,6 @@ async function main() {
   if (!started) {
     throw new Error('Could not start host terminal session');
   }
-
-  await waitFor(
-    async () =>
-      Boolean(
-        await evaluate(
-          Runtime,
-          "document.querySelector('.window-frame[data-app-id=\"terminal\"] pre') instanceof HTMLElement"
-        )
-      ),
-    'Terminal output panel is not available'
-  );
 
   const submitted = await evaluate(
     Runtime,
@@ -355,13 +364,42 @@ async function main() {
     async () => {
       const result = await evaluate(
         Runtime,
-        "(() => ({ status: document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '', output: document.querySelector('.window-frame pre')?.textContent ?? '', windowCount: document.querySelectorAll('.window-frame').length, iconCount: document.querySelectorAll('.desktop-icon').length }))()"
+        `(() => {
+          const status = document.querySelector('.taskbar__window .taskbar__status')?.textContent?.trim() ?? '';
+          const windowCount = document.querySelectorAll('.window-frame').length;
+          const iconCount = document.querySelectorAll('.desktop-icon').length;
+          const frame = document.querySelector('.window-frame[data-app-id="terminal"]');
+          if (!(frame instanceof HTMLElement)) {
+            return { status, windowCount, iconCount, ok: false };
+          }
+          const windowId = frame.dataset.windowId;
+          const registry = globalThis.__AIONIOS_XTERM__;
+          const terminal = windowId && registry ? registry[windowId] : null;
+          const active = terminal?.buffer?.active;
+          if (!active) {
+            return { status, windowCount, iconCount, ok: false };
+          }
+          const start = Math.max(0, active.length - 80);
+          let text = '';
+          for (let i = start; i < active.length; i += 1) {
+            const line = active.getLine(i);
+            if (line) {
+              text += line.translateToString(true) + '\\n';
+            }
+          }
+          return {
+            status,
+            windowCount,
+            iconCount,
+            ok: text.includes('__AIONIOS_TERMINAL_OK__')
+          };
+        })()`
       );
       return (
         result.status === 'ready' &&
         result.windowCount === 1 &&
         result.iconCount >= 1 &&
-        result.output.includes('__AIONIOS_TERMINAL_OK__')
+        result.ok
       );
     },
     'Terminal command execution did not produce expected host output'

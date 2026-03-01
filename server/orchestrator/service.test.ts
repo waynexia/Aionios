@@ -66,7 +66,7 @@ describe('WindowOrchestrator', () => {
 
     const moduleSnapshot = orchestrator.getWindowModuleSource(sessionId, 'window-system-terminal');
     expect(moduleSnapshot.revision).toBe(1);
-    expect(moduleSnapshot.source).toContain('host.terminal.sendInput');
+    expect(moduleSnapshot.source).toContain('@xterm/xterm');
   });
 
   it('keeps system app updates as no-op', () => {

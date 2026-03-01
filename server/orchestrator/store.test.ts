@@ -103,7 +103,8 @@ describe('system modules', () => {
     const source = getSystemModuleSource('terminal');
     expect(source).toBeDefined();
     expect(source).toContain('export default function WindowApp');
-    expect(source).toContain('host.terminal.sendInput');
+    expect(source).toContain("@xterm/xterm");
+    expect(source).toContain('data-terminal-xterm');
   });
 
   it('provides preference system app source and marks it as system', () => {

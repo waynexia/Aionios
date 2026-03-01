@@ -5,6 +5,7 @@ import { createServer as createViteServer } from 'vite';
 import { PreferenceConfigStore } from './config';
 import { WindowOrchestrator } from './orchestrator';
 import { TerminalManager } from './terminal/manager';
+import { attachTerminalWebSocketServer } from './terminal/ws';
 import {
   ViteWindowModuleBridge,
   createWindowModulePlugin
@@ -251,8 +252,14 @@ async function startServer() {
     });
   });
 
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`[aionios] dev server listening on http://localhost:${port}`);
+  });
+
+  attachTerminalWebSocketServer({
+    server,
+    orchestrator,
+    terminalManager
   });
 }
 
