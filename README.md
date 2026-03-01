@@ -6,7 +6,7 @@ The host (desktop/taskbar/window manager/state) is static React code, while each
 ## What it includes
 
 - Desktop shell with icons, window manager, and taskbar.
-- Built-in system apps backed by the host Node server: **Terminal** and **Preference**.
+- Built-in system apps backed by the host Node server: **Terminal**, **Preference**, **Directory**, **Media**, and **Editor**.
 - Host API bridge for generated apps (`openApp`, `readFile`, `writeFile`, `requestUpdate`, `listFiles`, `preference`, `terminal`).
 - Thin Node orchestrator for session/window lifecycle, prompt context, revision history, rollback, and event streaming.
 - Terminal API endpoints for start/input/stop with per-window stream events over SSE.

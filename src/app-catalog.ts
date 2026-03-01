@@ -16,6 +16,27 @@ export const APP_CATALOG: AppDefinition[] = [
     kind: 'system'
   },
   {
+    appId: 'directory',
+    title: 'Directory',
+    icon: '📁',
+    hint: 'Host file and directory explorer',
+    kind: 'system'
+  },
+  {
+    appId: 'media',
+    title: 'Media',
+    icon: '🎬',
+    hint: 'Photo, audio, and video player',
+    kind: 'system'
+  },
+  {
+    appId: 'editor',
+    title: 'Editor',
+    icon: '🧾',
+    hint: 'Text editor with syntax highlighting',
+    kind: 'system'
+  },
+  {
     appId: 'notes',
     title: 'LLM Notes',
     icon: '📝',

@@ -1,3 +1,7 @@
+import { DIRECTORY_WINDOW_SOURCE } from './system-apps/directory';
+import { EDITOR_WINDOW_SOURCE } from './system-apps/editor';
+import { MEDIA_WINDOW_SOURCE } from './system-apps/media';
+
 const TERMINAL_WINDOW_SOURCE = `
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -378,7 +382,10 @@ export default function WindowApp({ host, windowState }: WindowProps) {
 
 const SYSTEM_MODULE_SOURCES = {
   terminal: TERMINAL_WINDOW_SOURCE,
-  preference: PREFERENCE_WINDOW_SOURCE
+  preference: PREFERENCE_WINDOW_SOURCE,
+  directory: DIRECTORY_WINDOW_SOURCE,
+  media: MEDIA_WINDOW_SOURCE,
+  editor: EDITOR_WINDOW_SOURCE
 } as const;
 
 export function isSystemApp(appId: string): boolean {

@@ -115,4 +115,33 @@ describe('system modules', () => {
     expect(isSystemApp('preference')).toBe(true);
     expect(isSystemApp('notes')).toBe(false);
   });
+
+  it('provides directory system app source and marks it as system', () => {
+    const source = getSystemModuleSource('directory');
+    expect(source).toBeDefined();
+    expect(source).toContain('data-directory-app');
+    expect(source).toContain('host.listFiles');
+    expect(source).toContain('host.readFile');
+    expect(source).toContain('host.writeFile');
+    expect(isSystemApp('directory')).toBe(true);
+  });
+
+  it('provides media system app source and marks it as system', () => {
+    const source = getSystemModuleSource('media');
+    expect(source).toBeDefined();
+    expect(source).toContain('data-media-app');
+    expect(source).toContain('data-media-player');
+    expect(source).toContain('<audio');
+    expect(source).toContain('<video');
+    expect(isSystemApp('media')).toBe(true);
+  });
+
+  it('provides editor system app source and marks it as system', () => {
+    const source = getSystemModuleSource('editor');
+    expect(source).toBeDefined();
+    expect(source).toContain('data-editor-app');
+    expect(source).toContain('data-editor-textarea');
+    expect(source).toContain("import('shiki')");
+    expect(isSystemApp('editor')).toBe(true);
+  });
 });
