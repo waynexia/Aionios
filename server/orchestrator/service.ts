@@ -367,6 +367,9 @@ export default function WindowApp() {
       });
     } catch (error) {
       const message = (error as Error).message;
+      if (!this.store.getWindow(sessionId, windowId)) {
+        return;
+      }
       this.store.setError(sessionId, windowId, message);
       this.store.addContextEntry(
         sessionId,
