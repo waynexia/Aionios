@@ -256,61 +256,6 @@ body,
   text-align: center;
 }
 
-.file-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 260px;
-  z-index: 2;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.7);
-  padding: 12px;
-  overflow: auto;
-}
-
-.file-panel h2 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-
-.file-panel__empty {
-  margin: 0;
-  color: #cbd5e1;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.file-panel__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.file-panel__item {
-  border: 1px solid rgba(71, 85, 105, 0.7);
-  border-radius: 10px;
-  padding: 8px;
-  background: rgba(2, 6, 23, 0.45);
-}
-
-.file-panel__path {
-  margin: 0;
-  color: #93c5fd;
-  font-size: 11px;
-}
-
-.file-panel__content {
-  margin: 6px 0 0;
-  color: #e2e8f0;
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
 .taskbar {
   height: 54px;
   display: flex;

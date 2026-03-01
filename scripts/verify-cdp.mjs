@@ -195,19 +195,16 @@ async function main() {
       const icon = Array.from(document.querySelectorAll('.desktop-icon')).find((item) => item.textContent?.includes('Terminal'));
       const desktopIcons = document.querySelector('.desktop-icons');
       const workspace = document.querySelector('.desktop-shell__workspace');
-      const filePanel = document.querySelector('.file-panel');
       if (
         !(icon instanceof HTMLElement) ||
         !(desktopIcons instanceof HTMLElement) ||
-        !(workspace instanceof HTMLElement) ||
-        !(filePanel instanceof HTMLElement)
+        !(workspace instanceof HTMLElement)
       ) {
         return null;
       }
       const iconRect = icon.getBoundingClientRect();
       const desktopRect = desktopIcons.getBoundingClientRect();
       const workspaceRect = workspace.getBoundingClientRect();
-      const filePanelRect = filePanel.getBoundingClientRect();
       const relativeLeft = iconRect.left - desktopRect.left;
       const relativeTop = iconRect.top - desktopRect.top;
       const maxShiftRight = Math.max(0, desktopRect.width - relativeLeft - iconRect.width);
@@ -223,7 +220,6 @@ async function main() {
         desktopHeight: Math.round(desktopRect.height),
         workspaceWidth: Math.round(workspaceRect.width),
         workspaceHeight: Math.round(workspaceRect.height),
-        filePanelHeight: Math.round(filePanelRect.height),
         maxShiftRight: Math.round(maxShiftRight),
         maxShiftDown: Math.round(maxShiftDown)
       };
@@ -295,11 +291,6 @@ async function main() {
   if (terminalIconBeforeDrag.desktopHeight < Math.floor(terminalIconBeforeDrag.workspaceHeight * 0.7)) {
     throw new Error(
       `Desktop icon layer is too short (${terminalIconBeforeDrag.desktopHeight}px vs workspace ${terminalIconBeforeDrag.workspaceHeight}px)`
-    );
-  }
-  if (terminalIconBeforeDrag.filePanelHeight < Math.floor(terminalIconBeforeDrag.workspaceHeight * 0.8)) {
-    throw new Error(
-      `Host Files panel height is too short (${terminalIconBeforeDrag.filePanelHeight}px vs workspace ${terminalIconBeforeDrag.workspaceHeight}px)`
     );
   }
   if (horizontalShift < minimumExpectedHorizontalShift) {

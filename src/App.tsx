@@ -12,7 +12,6 @@ import {
 } from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
 import { DesktopIcons } from './components/DesktopIcons';
-import { FilePanel } from './components/FilePanel';
 import { Taskbar } from './components/Taskbar';
 import { WindowFrame } from './components/WindowFrame';
 import { WindowRuntime } from './components/WindowRuntime';
@@ -636,14 +635,6 @@ export default function App() {
     [state.windows]
   );
 
-  const files = useMemo(
-    () =>
-      Object.values(state.files).sort((left, right) =>
-        left.path.localeCompare(right.path, 'en-US')
-      ),
-    [state.files]
-  );
-
   if (state.bootError) {
     return <div className="booting-shell">Unable to boot desktop: {state.bootError}</div>;
   }
@@ -659,7 +650,6 @@ export default function App() {
       <div className="desktop-shell__workspace">
         <div className="desktop-shell__items">
           <DesktopIcons apps={APP_CATALOG} onOpenApp={openApp} />
-          <FilePanel files={files} />
         </div>
         <section ref={windowCanvasRef} className="window-canvas">
           {orderedWindows.map((windowItem) => {
