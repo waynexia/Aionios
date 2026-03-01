@@ -85,7 +85,8 @@ type AppAction =
 
 const MAX_TERMINAL_BUFFER_CHARS = 40_000;
 
-const initialState: AppState = {
+// eslint-disable-next-line react-refresh/only-export-components
+export const initialState: AppState = {
   windows: [],
   nextZIndex: 10,
   files: {},
@@ -192,15 +193,30 @@ function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
 
   return {
     ...state,
-    windows: updateWindow(state.windows, event.windowId, (windowItem) => ({
-      ...windowItem,
-      title: event.title ?? windowItem.title,
-      status,
-      revision: event.revision ?? windowItem.revision,
-      strategy,
-      error: event.error ?? (status === 'error' ? windowItem.error : undefined),
-      minimized: status === 'ready' ? false : windowItem.minimized
-    }))
+    windows: updateWindow(state.windows, event.windowId, (windowItem) => {
+      if (typeof event.revision === 'number' && event.revision < windowItem.revision) {
+        return windowItem;
+      }
+      const isStaleOpenSnapshot =
+        event.type === 'window-status' &&
+        status === 'loading' &&
+        windowItem.status !== 'loading' &&
+        typeof event.revision === 'number' &&
+        event.revision === windowItem.revision &&
+        event.strategy === 'remount';
+      if (isStaleOpenSnapshot) {
+        return windowItem;
+      }
+      return {
+        ...windowItem,
+        title: event.title ?? windowItem.title,
+        status,
+        revision: event.revision ?? windowItem.revision,
+        strategy,
+        error: event.error ?? (status === 'error' ? windowItem.error : undefined),
+        minimized: status === 'ready' ? false : windowItem.minimized
+      };
+    })
   };
 }
 
@@ -211,7 +227,8 @@ function applyServerEvent(state: AppState, event: ServerWindowEvent): AppState {
   return applyWindowEvent(state, event);
 }
 
-function reducer(state: AppState, action: AppAction): AppState {
+// eslint-disable-next-line react-refresh/only-export-components
+export function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'session-ready':
       return {
