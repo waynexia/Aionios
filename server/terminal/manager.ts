@@ -58,12 +58,15 @@ export class TerminalManager {
   start(sessionId: string, windowId: string): TerminalSessionMetadata {
     const key = buildSessionKey(sessionId, windowId);
     const existing = this.sessions.get(key);
-    if (existing && !existing.process.killed) {
-      return {
-        shell: existing.shell,
-        cwd: existing.cwd,
-        status: 'running'
-      };
+    if (existing) {
+      if (this.isSessionActive(existing)) {
+        return {
+          shell: existing.shell,
+          cwd: existing.cwd,
+          status: 'running'
+        };
+      }
+      this.sessions.delete(key);
     }
 
     const shell = getDefaultShell();
@@ -113,6 +116,7 @@ export class TerminalManager {
         });
       });
       child.on('error', (error) => {
+        this.clearSession(key, child);
         this.publish({
           type: 'terminal-status',
           sessionId,
@@ -124,7 +128,7 @@ export class TerminalManager {
         });
       });
       child.on('close', (code, signal) => {
-        this.sessions.delete(key);
+        this.clearSession(key, child);
         this.publish({
           type: 'terminal-exit',
           sessionId,
@@ -191,8 +195,36 @@ export class TerminalManager {
     if (!session) {
       return false;
     }
-    session.process.kill('SIGTERM');
-    return true;
+    if (!this.isSessionActive(session)) {
+      this.sessions.delete(key);
+      return false;
+    }
+    try {
+      const closed = session.process.kill('SIGTERM');
+      if (!closed) {
+        this.sessions.delete(key);
+      }
+      return closed;
+    } catch {
+      this.sessions.delete(key);
+      return false;
+    }
+  }
+
+  private isSessionActive(session: TerminalSession) {
+    return (
+      typeof session.process.pid === 'number' &&
+      session.process.exitCode === null &&
+      session.process.signalCode === null &&
+      !session.process.killed
+    );
+  }
+
+  private clearSession(key: string, target: ChildProcessWithoutNullStreams) {
+    const session = this.sessions.get(key);
+    if (session?.process === target) {
+      this.sessions.delete(key);
+    }
   }
 }
 
