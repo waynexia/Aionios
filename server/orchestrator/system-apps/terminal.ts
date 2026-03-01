@@ -1,5 +1,5 @@
 export const TERMINAL_WINDOW_SOURCE = `
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -61,9 +61,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const startedRef = useRef(false);
   const pendingInputRef = useRef('');
   const flushTimerRef = useRef<number | null>(null);
-  const [status, setStatus] = useState<'connecting' | 'ready' | 'error' | 'closed'>('connecting');
-  const [shell, setShell] = useState<string>('shell');
-  const [cwd, setCwd] = useState<string>('');
 
   const wsUrl = useMemo(() => resolveWebSocketUrl(host), [host.sessionId, host.windowId]);
 
@@ -157,7 +154,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     requestAnimationFrame(resizeTerminal);
 
     socket.addEventListener('open', () => {
-      setStatus('connecting');
       fitAddon.fit();
       const size = { cols: terminal.cols || 80, rows: terminal.rows || 24 };
       lastSizeRef.current = size;
@@ -176,9 +172,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         return;
       }
       if (message.type === 'ready') {
-        setShell(message.shell);
-        setCwd(message.cwd);
-        setStatus('ready');
         return;
       }
       if (message.type === 'data') {
@@ -188,17 +181,8 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         return;
       }
       if (message.type === 'error') {
-        setStatus('error');
         terminal.writeln(\`\\r\\n[Aionios Terminal Error] \${message.message}\\r\\n\`);
       }
-    });
-
-    socket.addEventListener('close', () => {
-      setStatus('closed');
-    });
-
-    socket.addEventListener('error', () => {
-      setStatus('error');
     });
 
     const handlePointerDown = () => {
@@ -233,19 +217,8 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     };
   }, [host.windowId, wsUrl]);
 
-  const headerMeta = cwd ? shell + ' · ' + cwd : shell;
-
   return (
-    <div data-terminal-app style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, gap: 10 }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <strong>{windowState.title}</strong>
-          <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.8 }}>{headerMeta}</p>
-        </div>
-        <span style={{ fontSize: 12, padding: '4px 8px', borderRadius: 999, background: 'rgba(30,41,59,0.8)' }}>
-          {status}
-        </span>
-      </header>
+    <div data-terminal-app style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <div
         data-terminal-xterm
         ref={containerRef}
@@ -253,14 +226,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           flex: 1,
           minHeight: 0,
           overflow: 'hidden',
-          borderRadius: 10,
-          border: '1px solid rgba(148,163,184,0.35)',
           background: '#020617'
         }}
       />
-      <p style={{ margin: 0, fontSize: 12, opacity: 0.75 }}>
-        Tip: use your normal shell keybindings (history, Ctrl+C, Ctrl+R, etc). Resize the window to update the PTY.
-      </p>
     </div>
   );
 }

@@ -169,6 +169,11 @@ body,
   overflow: auto;
 }
 
+.window-frame[data-app-id='terminal'] .window-frame__content {
+  padding: 0;
+  overflow: hidden;
+}
+
 .window-frame__resize-handle {
   position: absolute;
   z-index: 20;
