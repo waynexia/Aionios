@@ -21,11 +21,23 @@ export interface AppDefinition {
   kind: 'system' | 'llm';
 }
 
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface DesktopWindow {
   windowId: string;
   sessionId: string;
   appId: string;
   title: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  maximized: boolean;
   status: ClientWindowStatus;
   revision: number;
   strategy: UpdateStrategy;

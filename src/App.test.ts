@@ -108,4 +108,69 @@ describe('window event ordering guard', () => {
     expect(getWindow(loading).status).toBe('loading');
     expect(getWindow(loading).revision).toBe(1);
   });
+
+  it('supports bounds updates and maximize toggle behavior', () => {
+    const opened = buildStateWithWindow();
+    expect(getWindow(opened)).toMatchObject({
+      x: 18,
+      y: 18,
+      width: 760,
+      height: 520,
+      maximized: false
+    });
+
+    const resized = reducer(opened, {
+      type: 'window-set-bounds',
+      windowId: 'window-1',
+      bounds: {
+        x: 80,
+        y: 70,
+        width: 900,
+        height: 640
+      }
+    });
+    expect(getWindow(resized)).toMatchObject({
+      x: 80,
+      y: 70,
+      width: 900,
+      height: 640,
+      maximized: false
+    });
+
+    const maximized = reducer(resized, {
+      type: 'window-toggle-maximize',
+      windowId: 'window-1'
+    });
+    expect(getWindow(maximized).maximized).toBe(true);
+
+    const ignoredResize = reducer(maximized, {
+      type: 'window-set-bounds',
+      windowId: 'window-1',
+      bounds: {
+        x: 15,
+        y: 25,
+        width: 320,
+        height: 260
+      }
+    });
+    expect(getWindow(ignoredResize)).toMatchObject({
+      x: 80,
+      y: 70,
+      width: 900,
+      height: 640,
+      maximized: true
+    });
+
+    const restored = reducer(ignoredResize, {
+      type: 'window-toggle-maximize',
+      windowId: 'window-1'
+    });
+    expect(getWindow(restored)).toMatchObject({
+      x: 80,
+      y: 70,
+      width: 900,
+      height: 640,
+      maximized: false
+    });
+  });
 });

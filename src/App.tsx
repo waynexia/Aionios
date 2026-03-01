@@ -23,7 +23,8 @@ import type {
   HostFileEntry,
   ServerWindowEvent,
   TerminalStateSnapshot,
-  UpdateStrategy
+  UpdateStrategy,
+  WindowBounds
 } from './types';
 
 type TerminalServerEvent = Extract<
@@ -74,6 +75,15 @@ type AppAction =
       windowId: string;
     }
   | {
+      type: 'window-toggle-maximize';
+      windowId: string;
+    }
+  | {
+      type: 'window-set-bounds';
+      windowId: string;
+      bounds: WindowBounds;
+    }
+  | {
       type: 'window-server-event';
       event: ServerWindowEvent;
     }
@@ -84,6 +94,11 @@ type AppAction =
     };
 
 const MAX_TERMINAL_BUFFER_CHARS = 40_000;
+const DEFAULT_WINDOW_WIDTH = 760;
+const DEFAULT_WINDOW_HEIGHT = 520;
+const WINDOW_CASCADE_X = 30;
+const WINDOW_CASCADE_Y = 26;
+const WINDOW_CASCADE_LIMIT = 6;
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const initialState: AppState = {
@@ -120,6 +135,16 @@ function normalizeTerminalBuffer(buffer: string) {
     return buffer;
   }
   return buffer.slice(buffer.length - MAX_TERMINAL_BUFFER_CHARS);
+}
+
+function createInitialWindowBounds(windows: DesktopWindow[]): WindowBounds {
+  const cascadeIndex = windows.length % WINDOW_CASCADE_LIMIT;
+  return {
+    x: 18 + cascadeIndex * WINDOW_CASCADE_X,
+    y: 18 + cascadeIndex * WINDOW_CASCADE_Y,
+    width: DEFAULT_WINDOW_WIDTH,
+    height: DEFAULT_WINDOW_HEIGHT
+  };
 }
 
 function applyTerminalEvent(state: AppState, event: TerminalServerEvent): AppState {
@@ -243,11 +268,17 @@ export function reducer(state: AppState, action: AppAction): AppState {
       };
     case 'window-open-local': {
       const nextZ = state.nextZIndex + 1;
+      const initialBounds = createInitialWindowBounds(state.windows);
       const nextWindow: DesktopWindow = {
         windowId: action.windowId,
         sessionId: action.sessionId,
         appId: action.appId,
         title: action.title,
+        x: initialBounds.x,
+        y: initialBounds.y,
+        width: initialBounds.width,
+        height: initialBounds.height,
+        maximized: false,
         status: action.initialStatus ?? 'loading',
         revision: action.initialRevision ?? 0,
         strategy: 'remount',
@@ -295,6 +326,35 @@ export function reducer(state: AppState, action: AppAction): AppState {
           ...windowItem,
           minimized: !windowItem.minimized
         }))
+      };
+    case 'window-toggle-maximize': {
+      const nextZ = state.nextZIndex + 1;
+      return {
+        ...state,
+        nextZIndex: nextZ,
+        focusedWindowId: action.windowId,
+        windows: updateWindow(state.windows, action.windowId, (windowItem) => ({
+          ...windowItem,
+          maximized: !windowItem.maximized,
+          minimized: false,
+          zIndex: nextZ
+        }))
+      };
+    }
+    case 'window-set-bounds':
+      return {
+        ...state,
+        windows: updateWindow(state.windows, action.windowId, (windowItem) =>
+          windowItem.maximized
+            ? windowItem
+            : {
+                ...windowItem,
+                x: action.bounds.x,
+                y: action.bounds.y,
+                width: action.bounds.width,
+                height: action.bounds.height
+              }
+        )
       };
     case 'window-server-event':
       return applyServerEvent(state, action.event);
@@ -630,6 +690,19 @@ export default function App() {
                 showRevision={getAppDefinition(windowItem.appId)?.kind !== 'system'}
                 focused={windowItem.windowId === state.focusedWindowId}
                 onFocus={() => dispatch({ type: 'window-focus', windowId: windowItem.windowId })}
+                onBoundsChange={(bounds) =>
+                  dispatch({
+                    type: 'window-set-bounds',
+                    windowId: windowItem.windowId,
+                    bounds
+                  })
+                }
+                onToggleMaximize={() =>
+                  dispatch({
+                    type: 'window-toggle-maximize',
+                    windowId: windowItem.windowId
+                  })
+                }
                 onMinimize={() =>
                   dispatch({
                     type: 'window-toggle-minimize',

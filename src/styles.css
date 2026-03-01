@@ -78,15 +78,17 @@ body,
 
 .window-canvas {
   position: relative;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .window-frame {
   position: absolute;
   left: 18px;
   top: 18px;
-  width: min(720px, calc(100% - 36px));
-  min-height: 420px;
+  width: 760px;
+  height: 520px;
+  min-width: 220px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   border-radius: 14px;
@@ -96,13 +98,16 @@ body,
   box-shadow: 0 16px 60px rgba(2, 6, 23, 0.5);
 }
 
-.window-frame + .window-frame {
-  left: 40px;
-  top: 44px;
-}
-
 .window-frame--focused {
   border-color: rgba(147, 197, 253, 0.8);
+}
+
+.window-frame--maximized {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0;
 }
 
 .window-frame__header {
@@ -113,6 +118,12 @@ body,
   padding: 10px 12px;
   background: rgba(2, 6, 23, 0.7);
   border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  cursor: move;
+  user-select: none;
+}
+
+.window-frame--maximized .window-frame__header {
+  cursor: default;
 }
 
 .window-frame__title {
@@ -145,6 +156,77 @@ body,
   flex: 1;
   min-height: 0;
   padding: 14px;
+  overflow: auto;
+}
+
+.window-frame__resize-handle {
+  position: absolute;
+  z-index: 20;
+  touch-action: none;
+}
+
+.window-frame__resize-handle--n {
+  top: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: n-resize;
+}
+
+.window-frame__resize-handle--s {
+  bottom: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: s-resize;
+}
+
+.window-frame__resize-handle--e {
+  top: 8px;
+  right: -4px;
+  bottom: 8px;
+  width: 8px;
+  cursor: e-resize;
+}
+
+.window-frame__resize-handle--w {
+  top: 8px;
+  left: -4px;
+  bottom: 8px;
+  width: 8px;
+  cursor: w-resize;
+}
+
+.window-frame__resize-handle--ne {
+  top: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: ne-resize;
+}
+
+.window-frame__resize-handle--nw {
+  top: -4px;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: nw-resize;
+}
+
+.window-frame__resize-handle--se {
+  right: -4px;
+  bottom: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: se-resize;
+}
+
+.window-frame__resize-handle--sw {
+  left: -4px;
+  bottom: -4px;
+  width: 12px;
+  height: 12px;
+  cursor: sw-resize;
 }
 
 .window-runtime__status {
