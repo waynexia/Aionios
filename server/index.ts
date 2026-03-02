@@ -8,6 +8,7 @@ import { WindowOrchestrator } from './orchestrator';
 import { createAppDescriptor, listAppDescriptors } from './storage/app-descriptors';
 import { HostFileSystem } from './storage/host-fs';
 import { PersistedAppStore } from './storage/persisted-apps';
+import { RecycleBinItemNotFoundError, RecycleBinStore } from './storage/recycle-bin';
 import { TerminalManager } from './terminal/manager';
 import { attachTerminalWebSocketServer } from './terminal/ws';
 import {
@@ -60,6 +61,9 @@ async function startServer() {
   })();
   const hostFs = new HostFileSystem({
     rootDir: path.join(dataDir, 'fs')
+  });
+  const recycleBinStore = new RecycleBinStore({
+    rootDir: path.join(dataDir, 'recycle-bin')
   });
   const persistedAppStore = new PersistedAppStore({
     rootDir: path.join(dataDir, 'tmp', 'apps'),
@@ -205,6 +209,76 @@ async function startServer() {
       response.status(200).json({ ok: true });
     } catch (error) {
       response.status(400).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.get('/api/recycle-bin/items', async (_request, response) => {
+    try {
+      const items = await recycleBinStore.listItems();
+      response.status(200).json({ items });
+    } catch (error) {
+      response.status(500).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.post('/api/recycle-bin/trash', async (request, response) => {
+    const { path: virtualPath } = request.body as { path?: unknown };
+    if (typeof virtualPath !== 'string' || virtualPath.trim().length === 0) {
+      response.status(400).json({
+        message: 'path is required.'
+      });
+      return;
+    }
+
+    try {
+      const trashed = await recycleBinStore.trashHostFile(hostFs, virtualPath);
+      response.status(201).json(trashed);
+    } catch (error) {
+      const message = (error as Error).message;
+      const code = (error as NodeJS.ErrnoException).code;
+      response.status(code === 'ENOENT' ? 404 : 400).json({ message });
+    }
+  });
+
+  app.post('/api/recycle-bin/items/:id/restore', async (request, response) => {
+    const { id } = request.params;
+    try {
+      const restored = await recycleBinStore.restoreItem(hostFs, id);
+      response.status(200).json(restored);
+    } catch (error) {
+      const message = (error as Error).message;
+      const code = (error as NodeJS.ErrnoException).code;
+      const isNotFound = code === 'ENOENT' || error instanceof RecycleBinItemNotFoundError;
+      response.status(isNotFound ? 404 : 400).json({ message });
+    }
+  });
+
+  app.delete('/api/recycle-bin/items/:id', async (request, response) => {
+    const { id } = request.params;
+    try {
+      const deleted = await recycleBinStore.deleteItem(id);
+      if (!deleted) {
+        response.status(404).json({ message: 'Recycle bin item not found.' });
+        return;
+      }
+      response.status(200).json({ deleted: true });
+    } catch (error) {
+      response.status(400).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.post('/api/recycle-bin/empty', async (_request, response) => {
+    try {
+      const emptied = await recycleBinStore.empty();
+      response.status(200).json(emptied);
+    } catch (error) {
+      response.status(500).json({
         message: (error as Error).message
       });
     }
