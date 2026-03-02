@@ -47,7 +47,10 @@ function TaskbarClock() {
 export function Taskbar({ windows, focusedWindowId, onWindowClick }: TaskbarProps) {
   return (
     <footer className="taskbar">
-      <div className="taskbar__start">Aionios</div>
+      <div className="taskbar__start">
+        <img className="taskbar__start-icon" src="/icons/icon-white-48x48.png" alt="" />
+        <span>Aionios</span>
+      </div>
       <div className="taskbar__windows">
         {windows.map((windowItem) => (
           <button

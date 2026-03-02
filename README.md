@@ -28,6 +28,12 @@ npm run dev
 
 Then open `http://localhost:5173`.
 
+## Icons
+
+- Source icon: `icon.png`
+- White variant (for dark surfaces): `icon-white.png`
+- Static favicon/PWA assets live in `public/` (including `public/icons/`).
+
 ## LLM backend
 
 - Runtime preferences are server-owned and persisted in TOML at `.aionios/preferences.toml` (override path with `AIONIOS_CONFIG_PATH`).

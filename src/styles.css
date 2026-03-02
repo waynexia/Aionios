@@ -269,9 +269,19 @@ body,
 
 .taskbar__start {
   min-width: 84px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: 600;
   color: #93c5fd;
+}
+
+.taskbar__start-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  border-radius: 6px;
 }
 
 .taskbar__windows {
