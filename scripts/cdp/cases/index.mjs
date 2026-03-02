@@ -1,3 +1,4 @@
+import brandingIcons from './branding-icons.mjs';
 import contextMenu from './context-menu.mjs';
 import desktopIcons from './desktop-icons.mjs';
 import desktopShell from './desktop-shell.mjs';
@@ -11,6 +12,7 @@ import terminal from './terminal.mjs';
 
 export const cases = [
   desktopShell,
+  brandingIcons,
   taskbarClock,
   contextMenu,
   desktopIcons,
@@ -21,4 +23,3 @@ export const cases = [
   editor,
   finalState
 ];
-
