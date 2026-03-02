@@ -28,7 +28,7 @@ interface WindowFrameProps {
   onToggleMaximize: () => void;
   onClose: () => void;
   onMinimize: () => void;
-  onRequestUpdate?: (instruction: string) => void;
+  onRequestUpdate?: () => void;
   children: ReactNode;
 }
 
@@ -193,20 +193,7 @@ export function WindowFrame({
               type="button"
               disabled={windowItem.status === 'loading'}
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => {
-                const instruction = window.prompt(
-                  `Update "${windowItem.title}" (rev ${windowItem.revision})`,
-                  ''
-                );
-                if (instruction === null) {
-                  return;
-                }
-                const trimmed = instruction.trim();
-                if (!trimmed) {
-                  return;
-                }
-                onRequestUpdate(trimmed);
-              }}
+              onClick={() => onRequestUpdate()}
               aria-label="Ask LLM to update window"
               title="Ask LLM to update"
             >

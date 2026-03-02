@@ -11,9 +11,10 @@ import {
   updatePreferenceConfig
 } from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
-import { ContextMenu } from './components/ContextMenu';
+import { ContextMenu, type ContextMenuItem } from './components/ContextMenu';
 import { DesktopIcons } from './components/DesktopIcons';
 import { Taskbar } from './components/Taskbar';
+import { PromptDialog } from './components/PromptDialog';
 import { WindowFrame } from './components/WindowFrame';
 import { WindowRuntime } from './components/WindowRuntime';
 import type {
@@ -424,12 +425,36 @@ function randomWindowId() {
   return `window-${Math.random().toString(36).slice(2, 11)}`;
 }
 
+function deriveWindowTitleFromInstruction(instruction: string) {
+  const trimmed = instruction.trim();
+  if (!trimmed) {
+    return 'New App';
+  }
+  const firstLine = trimmed.split('\n').find((line) => line.trim().length > 0) ?? trimmed;
+  const collapsed = firstLine.replace(/\s+/g, ' ').trim();
+  const maxLength = 42;
+  if (collapsed.length <= maxLength) {
+    return collapsed;
+  }
+  return `${collapsed.slice(0, maxLength - 1)}…`;
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const filesRef = useRef(state.files);
   const sessionRef = useRef(state.sessionId);
   const windowCanvasRef = useRef<HTMLElement | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<
+    | { kind: 'desktop'; x: number; y: number }
+    | { kind: 'icon'; x: number; y: number; appId: string }
+    | null
+  >(null);
+  const [promptDialog, setPromptDialog] = useState<
+    | { mode: 'update'; windowId: string; title: string }
+    | { mode: 'open'; appId: string; title: string; hint: string }
+    | { mode: 'create' }
+    | null
+  >(null);
 
   useEffect(() => {
     filesRef.current = state.files;
@@ -532,7 +557,7 @@ export default function App() {
   }, []);
 
   const openApp = useCallback(
-    async (appId: string) => {
+    async (appId: string, instruction?: string) => {
       if (!state.sessionId) {
         return;
       }
@@ -541,6 +566,7 @@ export default function App() {
       const windowId = randomWindowId();
       const isSystemApp = definition?.kind === 'system';
       const canvas = getWindowCanvasDimensions();
+      const normalizedInstruction = instruction?.trim() ? instruction.trim() : undefined;
 
       if (isSystemApp) {
         try {
@@ -589,7 +615,71 @@ export default function App() {
           sessionId: state.sessionId,
           windowId,
           appId,
-          title
+          title,
+          instruction: normalizedInstruction
+        });
+        dispatch({
+          type: 'window-server-event',
+          event: {
+            type:
+              snapshot.status === 'ready'
+                ? 'window-ready'
+                : snapshot.status === 'error'
+                  ? 'window-error'
+                  : 'window-status',
+            sessionId: snapshot.sessionId,
+            windowId: snapshot.windowId,
+            appId: snapshot.appId,
+            title: snapshot.title,
+            status: snapshot.status,
+            revision: snapshot.revision,
+            strategy: 'remount',
+            error: snapshot.error
+          }
+        });
+      } catch (error) {
+        dispatch({
+          type: 'window-server-event',
+          event: {
+            type: 'window-error',
+            sessionId: state.sessionId,
+            windowId,
+            error: (error as Error).message
+          }
+        });
+      }
+    },
+    [getWindowCanvasDimensions, state.sessionId]
+  );
+
+  const createNewWindow = useCallback(
+    async (instruction: string) => {
+      if (!state.sessionId) {
+        return;
+      }
+
+      const windowId = randomWindowId();
+      const appId = 'custom';
+      const title = deriveWindowTitleFromInstruction(instruction);
+      const canvas = getWindowCanvasDimensions();
+      const normalizedInstruction = instruction.trim() ? instruction.trim() : undefined;
+
+      dispatch({
+        type: 'window-open-local',
+        windowId,
+        sessionId: state.sessionId,
+        appId,
+        title,
+        canvas
+      });
+
+      try {
+        const snapshot = await openWindow({
+          sessionId: state.sessionId,
+          windowId,
+          appId,
+          title,
+          instruction: normalizedInstruction
         });
         dispatch({
           type: 'window-server-event',
@@ -649,12 +739,51 @@ export default function App() {
   }, []);
 
   const contextMenuItems = useMemo(
-    () => [
-      { id: 'refresh', label: 'Refresh' },
-      { id: 'create', label: 'Create', disabled: true },
-      { id: 'delete', label: 'Delete', disabled: true }
-    ],
-    []
+    () => {
+      if (!contextMenu || contextMenu.kind === 'desktop') {
+        return [
+          { id: 'refresh', label: 'Refresh' },
+          {
+            id: 'create',
+            label: 'Create New',
+            onSelect: () => {
+              setPromptDialog({ mode: 'create' });
+            }
+          },
+          { id: 'delete', label: 'Delete', disabled: true }
+        ];
+      }
+
+      const definition = getAppDefinition(contextMenu.appId);
+      const items: ContextMenuItem[] = [
+        {
+          id: 'open',
+          label: `Open ${definition?.title ?? contextMenu.appId}`,
+          onSelect: () => {
+            void openApp(contextMenu.appId);
+          }
+        }
+      ];
+
+      if (definition?.kind === 'llm') {
+        items.push({
+          id: 'open-with-prompt',
+          label: 'Open with prompt…',
+          onSelect: () => {
+            setPromptDialog({
+              mode: 'open',
+              appId: contextMenu.appId,
+              title: definition.title,
+              hint: definition.hint
+            });
+          }
+        });
+      }
+
+      items.push({ id: 'delete', label: 'Delete', disabled: true });
+      return items;
+    },
+    [contextMenu, openApp]
   );
 
   if (state.bootError) {
@@ -676,7 +805,15 @@ export default function App() {
         }
         event.preventDefault();
         event.stopPropagation();
-        setContextMenu({ x: event.clientX, y: event.clientY });
+        const icon = event.target instanceof Element ? event.target.closest('.desktop-icon[data-app-id]') : null;
+        if (icon instanceof HTMLElement) {
+          const appId = icon.getAttribute('data-app-id');
+          if (appId) {
+            setContextMenu({ kind: 'icon', x: event.clientX, y: event.clientY, appId });
+            return;
+          }
+        }
+        setContextMenu({ kind: 'desktop', x: event.clientX, y: event.clientY });
       }}
     >
       <div className="desktop-shell__workspace">
@@ -768,9 +905,12 @@ export default function App() {
                 onRequestUpdate={
                   getAppDefinition(windowItem.appId)?.kind === 'system'
                     ? undefined
-                    : (instruction) => {
-                        void requestUpdateForWindow(windowItem.windowId, instruction);
-                      }
+                    : () =>
+                        setPromptDialog({
+                          mode: 'update',
+                          windowId: windowItem.windowId,
+                          title: windowItem.title
+                        })
                 }
                 onBoundsChange={(bounds) =>
                   dispatch({
@@ -838,6 +978,53 @@ export default function App() {
         y={contextMenu?.y ?? 0}
         items={contextMenuItems}
         onClose={closeContextMenu}
+      />
+      <PromptDialog
+        open={Boolean(promptDialog)}
+        title={
+          promptDialog?.mode === 'create'
+            ? 'Create New'
+            : promptDialog?.mode === 'open'
+              ? `Open “${promptDialog.title}” with a prompt`
+              : promptDialog
+                ? `Ask LLM to update “${promptDialog.title}”`
+                : 'Ask LLM'
+        }
+        description={
+          promptDialog?.mode === 'create' || promptDialog?.mode === 'open'
+            ? 'Describe what you want this new window to be.'
+            : 'Describe what you want to change in this window.'
+        }
+        placeholder={
+          promptDialog?.mode === 'open'
+            ? promptDialog.hint
+            : promptDialog?.mode === 'create'
+              ? 'E.g. A kanban board with drag-and-drop, keyboard shortcuts, and saved state.'
+              : 'E.g. Add a sidebar, improve styling, and add keyboard shortcuts.'
+        }
+        initialValue={promptDialog?.mode === 'open' ? promptDialog.hint : ''}
+        confirmLabel={
+          promptDialog?.mode === 'create'
+            ? 'Create'
+            : promptDialog?.mode === 'open'
+              ? 'Open'
+              : 'Update'
+        }
+        cancelLabel="Cancel"
+        onClose={() => setPromptDialog(null)}
+        onConfirm={(instruction) => {
+          if (!promptDialog) {
+            return;
+          }
+          if (promptDialog.mode === 'create') {
+            void createNewWindow(instruction);
+          } else if (promptDialog.mode === 'open') {
+            void openApp(promptDialog.appId, instruction);
+          } else {
+            void requestUpdateForWindow(promptDialog.windowId, instruction);
+          }
+          setPromptDialog(null);
+        }}
       />
     </div>
   );

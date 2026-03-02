@@ -52,13 +52,41 @@ export default {
     const contextMenuLabels = await ctx.evaluate(
       `(() => Array.from(document.querySelectorAll('[data-context-menu-item]')).map((item) => item.textContent?.trim() ?? ''))()`
     );
-    const requiredLabels = ['Refresh', 'Create', 'Delete'];
+    const requiredLabels = ['Refresh', 'Create New', 'Delete'];
     if (
       !Array.isArray(contextMenuLabels) ||
       requiredLabels.some((label) => !contextMenuLabels.includes(label))
     ) {
       throw new Error(`Unexpected context menu items: ${JSON.stringify(contextMenuLabels)}`);
     }
+
+    const createSelected = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-context-menu-item="create"]');
+        if (!(button instanceof HTMLButtonElement)) {
+          return false;
+        }
+        button.click();
+        return true;
+      })()`
+    );
+    if (!createSelected) {
+      throw new Error('Unable to select Create New from desktop context menu');
+    }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate("document.querySelector('[data-prompt-dialog]') instanceof HTMLElement")
+        ),
+      'Prompt dialog did not open after selecting Create New'
+    );
+
+    await pressKey(ctx, 'Escape');
+    await ctx.waitFor(
+      async () => Boolean(await ctx.evaluate("document.querySelector('[data-prompt-dialog]') === null")),
+      'Prompt dialog did not close after Escape key'
+    );
 
     await pressKey(ctx, 'Escape');
     await ctx.waitFor(
