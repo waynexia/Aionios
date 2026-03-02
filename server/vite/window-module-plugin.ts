@@ -44,7 +44,7 @@ export function createWindowModulePlugin(orchestrator: WindowOrchestrator): Plug
         return null;
       }
       const snapshot = orchestrator.getWindowModuleSource(parsed.sessionId, parsed.windowId);
-      return `${snapshot.source}\n\nexport const __aioniosRevision = ${snapshot.revision};`;
+      return snapshot.source;
     }
   };
 }
@@ -61,8 +61,30 @@ function sendRemountEvent(viteServer: ViteDevServer, sessionId: string, windowId
   });
 }
 
+async function sendHmrJsUpdate(viteServer: ViteDevServer, modulePath: string) {
+  const moduleNode = await viteServer.moduleGraph.getModuleByUrl(modulePath);
+  if (moduleNode) {
+    viteServer.moduleGraph.invalidateModule(moduleNode);
+  }
+  viteServer.ws.send({
+    type: 'update',
+    updates: [
+      {
+        type: 'js-update',
+        path: modulePath,
+        acceptedPath: modulePath,
+        timestamp: Date.now()
+      }
+    ]
+  });
+}
+
 export class ViteWindowModuleBridge implements ModuleUpdateBridge {
-  constructor(private readonly viteServer: ViteDevServer) {}
+  private readonly hmrEnabled: boolean;
+
+  constructor(private readonly viteServer: ViteDevServer) {
+    this.hmrEnabled = this.viteServer.config.server.hmr !== false;
+  }
 
   async pushWindowUpdate(
     sessionId: string,
@@ -70,7 +92,21 @@ export class ViteWindowModuleBridge implements ModuleUpdateBridge {
     strategy: UpdateStrategy
   ): Promise<{ strategy: UpdateStrategy }> {
     if (strategy === 'remount') {
-      sendRemountEvent(this.viteServer, sessionId, windowId);
+      if (this.hmrEnabled) {
+        const modulePath = getWindowModuleId(sessionId, windowId);
+        try {
+          await sendHmrJsUpdate(this.viteServer, modulePath);
+        } catch (error) {
+          console.error('[aionios] hmr push failed before remount event', error);
+        }
+        sendRemountEvent(this.viteServer, sessionId, windowId);
+      }
+      return {
+        strategy: 'remount'
+      };
+    }
+
+    if (!this.hmrEnabled) {
       return {
         strategy: 'remount'
       };
@@ -78,21 +114,7 @@ export class ViteWindowModuleBridge implements ModuleUpdateBridge {
 
     const modulePath = getWindowModuleId(sessionId, windowId);
     try {
-      const moduleNode = await this.viteServer.moduleGraph.getModuleByUrl(modulePath);
-      if (moduleNode) {
-        this.viteServer.moduleGraph.invalidateModule(moduleNode);
-      }
-      this.viteServer.ws.send({
-        type: 'update',
-        updates: [
-          {
-            type: 'js-update',
-            path: modulePath,
-            acceptedPath: modulePath,
-            timestamp: Date.now()
-          }
-        ]
-      });
+      await sendHmrJsUpdate(this.viteServer, modulePath);
       return { strategy: 'hmr' };
     } catch (error) {
       console.error('[aionios] hmr push failed, switching to remount', error);

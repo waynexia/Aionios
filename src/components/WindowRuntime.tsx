@@ -33,6 +33,7 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadedRevisionRef = useRef(0);
   const isSystemApp = getAppDefinition(windowItem.appId)?.kind === 'system';
+  const hmrSupported = Boolean(import.meta.hot);
   const moduleId = useMemo(
     () => getWindowModuleId(windowItem.sessionId, windowItem.windowId),
     [windowItem.sessionId, windowItem.windowId]
@@ -44,7 +45,7 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
     }
 
     const isInitialLoad = !moduleComponent || loadedRevisionRef.current === 0;
-    if (windowItem.strategy === 'hmr' && !isInitialLoad) {
+    if (hmrSupported && windowItem.strategy === 'hmr' && !isInitialLoad) {
       loadedRevisionRef.current = windowItem.revision;
       return;
     }
@@ -78,6 +79,7 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
     };
   }, [
     moduleComponent,
+    hmrSupported,
     moduleId,
     windowItem.mountNonce,
     windowItem.revision,

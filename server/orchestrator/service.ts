@@ -101,6 +101,13 @@ export class WindowOrchestrator {
         `Window opened for app "${windowRecord.appId}" titled "${windowRecord.title}".`
       )
     );
+    if (input.instruction) {
+      this.store.addContextEntry(
+        input.sessionId,
+        input.windowId,
+        createContextEntry('user', input.instruction)
+      );
+    }
 
     const systemSource = getSystemModuleSource(windowRecord.appId);
     if (systemSource) {
@@ -151,7 +158,8 @@ export class WindowOrchestrator {
       await this.generateRevision({
         sessionId: input.sessionId,
         windowId: input.windowId,
-        reason: 'initial'
+        reason: 'initial',
+        instruction: input.instruction
       });
     });
 

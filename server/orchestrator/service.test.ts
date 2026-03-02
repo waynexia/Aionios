@@ -103,6 +103,40 @@ describe('WindowOrchestrator', () => {
     expect(snapshot.revision).toBe(0);
   });
 
+  it('passes open-window instruction into initial generation', async () => {
+    const orchestrator = createOrchestrator();
+    const sessionId = orchestrator.createSession();
+    const windowId = 'window-llm-notes';
+    const deferred = createDeferred<{ source: string; backend: string }>();
+    generateMock.mockReturnValueOnce(deferred.promise);
+
+    orchestrator.openWindow({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      instruction: 'Build a note-taking tool with a markdown preview pane.'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(generateMock).toHaveBeenCalledTimes(1);
+    expect(generateMock.mock.calls[0]?.[0]).toMatchObject({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      reason: 'initial',
+      instruction: 'Build a note-taking tool with a markdown preview pane.'
+    });
+
+    deferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await deferred.promise;
+  });
+
   it('does not throw when generation finishes after the window is closed', async () => {
     const orchestrator = createOrchestrator();
     const sessionId = orchestrator.createSession();

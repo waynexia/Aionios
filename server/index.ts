@@ -89,10 +89,11 @@ async function startServer() {
 
   app.post('/api/sessions/:sessionId/windows/open', (request, response) => {
     const { sessionId } = request.params;
-    const { windowId, appId, title } = request.body as {
+    const { windowId, appId, title, instruction } = request.body as {
       windowId?: string;
       appId?: string;
       title?: string;
+      instruction?: unknown;
     };
     if (!windowId || !appId || !title) {
       response.status(400).json({
@@ -100,12 +101,23 @@ async function startServer() {
       });
       return;
     }
+    if (instruction !== undefined && typeof instruction !== 'string') {
+      response.status(400).json({
+        message: 'instruction must be a string when provided.'
+      });
+      return;
+    }
+    const normalizedInstruction =
+      typeof instruction === 'string' && instruction.trim().length > 0
+        ? instruction.trim()
+        : undefined;
     try {
       const snapshot = orchestrator.openWindow({
         sessionId,
         windowId,
         appId,
-        title
+        title,
+        instruction: normalizedInstruction
       });
       response.status(202).json(snapshot);
     } catch (error) {

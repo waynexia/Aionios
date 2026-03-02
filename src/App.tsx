@@ -765,6 +765,13 @@ export default function App() {
                 showRevision={getAppDefinition(windowItem.appId)?.kind !== 'system'}
                 focused={windowItem.windowId === state.focusedWindowId}
                 onFocus={() => dispatch({ type: 'window-focus', windowId: windowItem.windowId })}
+                onRequestUpdate={
+                  getAppDefinition(windowItem.appId)?.kind === 'system'
+                    ? undefined
+                    : (instruction) => {
+                        void requestUpdateForWindow(windowItem.windowId, instruction);
+                      }
+                }
                 onBoundsChange={(bounds) =>
                   dispatch({
                     type: 'window-set-bounds',

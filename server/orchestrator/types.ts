@@ -43,6 +43,7 @@ export interface OpenWindowInput {
   windowId: string;
   appId: string;
   title: string;
+  instruction?: string;
 }
 
 export interface WindowActionInput {

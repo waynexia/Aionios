@@ -40,13 +40,15 @@ export async function openWindow(input: {
   windowId: string;
   appId: string;
   title: string;
+  instruction?: string;
 }) {
   return requestJson<ServerWindowSnapshot>(`/api/sessions/${input.sessionId}/windows/open`, {
     method: 'POST',
     body: JSON.stringify({
       windowId: input.windowId,
       appId: input.appId,
-      title: input.title
+      title: input.title,
+      instruction: input.instruction
     })
   });
 }

@@ -5,6 +5,7 @@ import desktopShell from './desktop-shell.mjs';
 import directory from './directory.mjs';
 import editor from './editor.mjs';
 import finalState from './final-state.mjs';
+import llmUpdate from './llm-update.mjs';
 import media from './media.mjs';
 import preference from './preference.mjs';
 import taskbarClock from './taskbar-clock.mjs';
@@ -16,6 +17,7 @@ export const cases = [
   taskbarClock,
   contextMenu,
   desktopIcons,
+  llmUpdate,
   terminal,
   preference,
   directory,
