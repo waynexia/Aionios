@@ -3,6 +3,7 @@ import type {
   PreferenceConfigUpdate,
   ServerWindowSnapshot,
   WindowRevisionDetail,
+  WindowRevisionPromptDetail,
   WindowRevisionSummary
 } from '../types';
 
@@ -71,6 +72,22 @@ export async function requestWindowUpdate(input: {
   );
 }
 
+export async function requestWindowPromptUpdate(input: {
+  sessionId: string;
+  windowId: string;
+  prompt: string;
+}) {
+  return requestJson<ServerWindowSnapshot>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/actions/prompt`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt: input.prompt
+      })
+    }
+  );
+}
+
 export async function rollbackWindow(input: {
   sessionId: string;
   windowId: string;
@@ -100,6 +117,16 @@ export async function getWindowRevision(input: {
 }) {
   return requestJson<WindowRevisionDetail>(
     `/api/sessions/${input.sessionId}/windows/${input.windowId}/revisions/${String(input.revision)}`
+  );
+}
+
+export async function getWindowRevisionPrompt(input: {
+  sessionId: string;
+  windowId: string;
+  revision: number;
+}) {
+  return requestJson<WindowRevisionPromptDetail>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/revisions/${String(input.revision)}/prompt`
   );
 }
 

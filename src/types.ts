@@ -119,6 +119,10 @@ export interface WindowRevisionDetail extends WindowRevisionSummary {
   source: string;
 }
 
+export interface WindowRevisionPromptDetail extends WindowRevisionSummary {
+  prompt: string;
+}
+
 export type ServerEventType =
   | 'window-status'
   | 'window-ready'

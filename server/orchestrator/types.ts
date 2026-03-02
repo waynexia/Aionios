@@ -59,6 +59,7 @@ export interface GenerateRequest {
   title: string;
   reason: 'initial' | 'action';
   instruction?: string;
+  promptOverride?: string;
   context: ContextEntry[];
   previousSource?: string;
 }

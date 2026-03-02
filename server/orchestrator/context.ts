@@ -19,6 +19,9 @@ function summarizeContext(context: ContextEntry[]): string {
 }
 
 export function buildGenerationPrompt(request: GenerateRequest): string {
+  if (typeof request.promptOverride === 'string' && request.promptOverride.trim().length > 0) {
+    return request.promptOverride;
+  }
   const contextSummary = summarizeContext(request.context);
   const instruction = request.instruction
     ? `User instruction for this update:\n${request.instruction}\n`

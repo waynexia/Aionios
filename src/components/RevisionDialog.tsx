@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { listWindowRevisions, rollbackWindow } from '../api/client';
+import {
+  getWindowRevisionPrompt,
+  listWindowRevisions,
+  requestWindowPromptUpdate,
+  rollbackWindow
+} from '../api/client';
 import type { WindowRevisionSummary } from '../types';
 
 interface RevisionDialogProps {
@@ -36,6 +41,13 @@ export function RevisionDialog({
   const [revisions, setRevisions] = useState<WindowRevisionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [rollingBackTo, setRollingBackTo] = useState<number | null>(null);
+  const [promptRevision, setPromptRevision] = useState<number | null>(null);
+  const [promptLoaded, setPromptLoaded] = useState<string>('');
+  const [promptDraft, setPromptDraft] = useState<string>('');
+  const [promptError, setPromptError] = useState<string | null>(null);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptEditing, setPromptEditing] = useState(false);
+  const [promptSubmitting, setPromptSubmitting] = useState(false);
 
   const orderedRevisions = useMemo(() => sortByRevisionDesc(revisions), [revisions]);
   const hasRevisions = orderedRevisions.length > 0;
@@ -58,7 +70,7 @@ export function RevisionDialog({
       return;
     }
     void refresh();
-  }, [open, refresh]);
+  }, [open, refresh, currentRevision]);
 
   useEffect(() => {
     if (!open) {
@@ -84,6 +96,87 @@ export function RevisionDialog({
     }
     dialogRef.current?.focus();
   }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      return;
+    }
+    setPromptRevision(null);
+    setPromptLoaded('');
+    setPromptDraft('');
+    setPromptError(null);
+    setPromptLoading(false);
+    setPromptEditing(false);
+    setPromptSubmitting(false);
+  }, [open]);
+
+  const viewPrompt = useCallback(
+    async (revision: number) => {
+      setPromptLoading(true);
+      setPromptError(null);
+      setPromptEditing(false);
+      setPromptSubmitting(false);
+      try {
+        const detail = await getWindowRevisionPrompt({ sessionId, windowId, revision });
+        setPromptRevision(detail.revision);
+        setPromptLoaded(detail.prompt);
+        setPromptDraft(detail.prompt);
+      } catch (reason) {
+        setPromptError((reason as Error).message);
+        setPromptRevision(revision);
+        setPromptLoaded('');
+        setPromptDraft('');
+      } finally {
+        setPromptLoading(false);
+      }
+    },
+    [sessionId, windowId]
+  );
+
+  const copyPrompt = useCallback(async () => {
+    if (!promptDraft) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(promptDraft);
+    } catch (reason) {
+      setPromptError((reason as Error).message);
+    }
+  }, [promptDraft]);
+
+  const closePromptViewer = useCallback(() => {
+    setPromptRevision(null);
+    setPromptLoaded('');
+    setPromptDraft('');
+    setPromptError(null);
+    setPromptEditing(false);
+    setPromptSubmitting(false);
+  }, []);
+
+  const resetPrompt = useCallback(() => {
+    setPromptDraft(promptLoaded);
+    setPromptError(null);
+  }, [promptLoaded]);
+
+  const regenerateFromPrompt = useCallback(async () => {
+    if (promptRevision === null) {
+      return;
+    }
+    setPromptSubmitting(true);
+    setPromptError(null);
+    try {
+      await requestWindowPromptUpdate({
+        sessionId,
+        windowId,
+        prompt: promptDraft
+      });
+      setPromptEditing(false);
+    } catch (reason) {
+      setPromptError((reason as Error).message);
+    } finally {
+      setPromptSubmitting(false);
+    }
+  }, [promptDraft, promptRevision, sessionId, windowId]);
 
   if (!open) {
     return null;
@@ -160,6 +253,17 @@ export function RevisionDialog({
                   <div className="revision-dialog__actions">
                     <button
                       type="button"
+                      className="revision-dialog__button revision-dialog__button--ghost"
+                      data-revision-prompt={revision.revision}
+                      disabled={rollingBackTo !== null || loading}
+                      onClick={() => {
+                        void viewPrompt(revision.revision);
+                      }}
+                    >
+                      View prompt
+                    </button>
+                    <button
+                      type="button"
                       className="revision-dialog__button"
                       data-revision-rollback={revision.revision}
                       disabled={isCurrent || rollingBackTo !== null}
@@ -188,6 +292,107 @@ export function RevisionDialog({
             })
           )}
         </section>
+
+        {promptRevision !== null ? (
+          <section className="revision-dialog__prompt" data-revision-prompt-viewer>
+            <header className="revision-dialog__prompt-header">
+              <strong>Prompt · rev {promptRevision}</strong>
+              <div className="revision-dialog__prompt-actions">
+                <button
+                  type="button"
+                  className="revision-dialog__button revision-dialog__button--ghost"
+                  disabled={promptLoading || promptSubmitting || !promptDraft}
+                  onClick={() => {
+                    void copyPrompt();
+                  }}
+                >
+                  Copy
+                </button>
+                {promptRevision === currentRevision ? (
+                  promptEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        className="revision-dialog__button revision-dialog__button--ghost"
+                        data-revision-prompt-reset
+                        disabled={promptLoading || promptSubmitting || promptDraft === promptLoaded}
+                        onClick={() => {
+                          resetPrompt();
+                        }}
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        className="revision-dialog__button"
+                        data-revision-prompt-regenerate
+                        disabled={promptLoading || promptSubmitting || promptDraft.trim().length === 0}
+                        onClick={() => {
+                          void regenerateFromPrompt();
+                        }}
+                      >
+                        {promptSubmitting ? 'Regenerating...' : 'Regenerate'}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="revision-dialog__button revision-dialog__button--ghost"
+                      data-revision-prompt-edit
+                      disabled={promptLoading || promptSubmitting}
+                      onClick={() => {
+                        setPromptEditing(true);
+                        setPromptError(null);
+                      }}
+                    >
+                      Edit
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className="revision-dialog__button revision-dialog__button--ghost"
+                    data-revision-prompt-edit
+                    disabled
+                    title="Only the current revision can be edited."
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="revision-dialog__button revision-dialog__button--ghost"
+                  data-revision-prompt-close
+                  onClick={() => {
+                    closePromptViewer();
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </header>
+            {promptLoading ? (
+              <p className="revision-dialog__status">Loading prompt...</p>
+            ) : (
+              <>
+                {promptError ? (
+                  <p className="revision-dialog__status revision-dialog__status--error">
+                    {promptEditing ? 'Unable to regenerate prompt: ' : 'Unable to load prompt: '}
+                    {promptError}
+                  </p>
+                ) : null}
+              <textarea
+                className="revision-dialog__prompt-textarea"
+                readOnly={!promptEditing}
+                value={promptDraft}
+                onChange={(event) => {
+                  setPromptDraft(event.target.value);
+                }}
+              />
+              </>
+            )}
+          </section>
+        ) : null}
       </div>
     </div>
   );

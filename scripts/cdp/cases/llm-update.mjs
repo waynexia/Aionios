@@ -271,6 +271,140 @@ export default {
       'Revision history did not list at least two revisions'
     );
 
+    const promptOpened = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-prompt="${updatedRevision}"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!promptOpened) {
+      throw new Error(`Unable to open prompt viewer for revision ${String(updatedRevision)}`);
+    }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate("document.querySelector('[data-revision-prompt-viewer]') instanceof HTMLElement")
+        ),
+      'Prompt viewer did not open'
+    );
+
+    const promptText = await ctx.evaluate(
+      `document.querySelector('.revision-dialog__prompt-textarea')?.value ?? ''`
+    );
+    if (!promptText.includes('[redacted]')) {
+      throw new Error(`Expected revision prompt to redact previous source, got: ${JSON.stringify(promptText.slice(0, 280))}`);
+    }
+    if (promptText.includes('Save to Host FS')) {
+      throw new Error('Revision prompt unexpectedly includes source content ("Save to Host FS")');
+    }
+
+    const promptEditedInstruction = 'Prompt edit: add a search bar';
+    const promptEditClicked = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-prompt-edit]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!promptEditClicked) {
+      throw new Error('Unable to enter prompt edit mode');
+    }
+
+    const promptEdited = await ctx.evaluate(
+      `(() => {
+        const textarea = document.querySelector('.revision-dialog__prompt-textarea');
+        if (!(textarea instanceof HTMLTextAreaElement)) return false;
+        const current = textarea.value;
+        const marker = 'User instruction for this update:';
+        const contextMarker = '\\nRecent context:';
+        const start = current.indexOf(marker);
+        if (start === -1) return false;
+        let contentStart = start + marker.length;
+        if (current[contentStart] === '\\r' && current[contentStart + 1] === '\\n') {
+          contentStart += 2;
+        } else if (current[contentStart] === '\\n') {
+          contentStart += 1;
+        }
+        const end = current.indexOf(contextMarker, contentStart);
+        const next =
+          end === -1
+            ? current.slice(0, contentStart) + ${JSON.stringify(promptEditedInstruction)} + '\\n'
+            : current.slice(0, contentStart) + ${JSON.stringify(promptEditedInstruction)} + current.slice(end);
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+        if (!setter) return false;
+        setter.call(textarea, next);
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      })()`
+    );
+    if (!promptEdited) {
+      throw new Error('Unable to edit prompt textarea');
+    }
+
+    const regenerateClicked = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-prompt-regenerate]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!regenerateClicked) {
+      throw new Error('Unable to regenerate from edited prompt');
+    }
+
+    await ctx.waitFor(
+      async () => {
+        const status = await getTaskbarStatus(ctx, windowId);
+        if (status !== 'ready') {
+          return false;
+        }
+        const revision = await ctx.evaluate(getRevisionExpression(windowId));
+        return typeof revision === 'number' && revision > updatedRevision;
+      },
+      'LLM window did not update after regenerating from edited prompt'
+    );
+
+    const regeneratedSummary = await ctx.evaluate(
+      `(() => {
+        const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+        if (!(frame instanceof HTMLElement)) return '';
+        const paragraphs = Array.from(frame.querySelectorAll('p'));
+        for (const paragraph of paragraphs) {
+          const text = paragraph.textContent?.trim() ?? '';
+          if (text.includes('Last instruction:')) {
+            return text;
+          }
+        }
+        return '';
+      })()`
+    );
+    if (!regeneratedSummary.includes(promptEditedInstruction)) {
+      throw new Error(
+        'Expected regenerated mock summary to reflect edited prompt instruction, got: ' +
+          JSON.stringify(regeneratedSummary)
+      );
+    }
+
+    const promptClosed = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-prompt-close]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!promptClosed) {
+      throw new Error('Unable to close prompt viewer');
+    }
+
     const rollbackClicked = await ctx.evaluate(
       `(() => {
         const button = document.querySelector('[data-revision-rollback="1"]');

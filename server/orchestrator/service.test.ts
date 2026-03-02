@@ -232,5 +232,87 @@ describe('WindowOrchestrator', () => {
     const revisionTwo = orchestrator.getWindowRevision(sessionId, windowId, 2);
     expect(revisionTwo.revision).toBe(2);
     expect(revisionTwo.prompt).toContain('Update instruction');
+
+    const revisionTwoPrompt = orchestrator.getWindowRevisionPrompt(sessionId, windowId, 2);
+    expect(revisionTwoPrompt.prompt).toContain('Previous module source:');
+    expect(revisionTwoPrompt.prompt).toContain('[redacted]');
+    expect(revisionTwoPrompt.prompt).not.toContain('Ready');
+  });
+
+  it('supports regenerating via edited prompt overrides', async () => {
+    const orchestrator = createOrchestrator();
+    const sessionId = orchestrator.createSession();
+    const windowId = 'window-llm-notes';
+    const initialDeferred = createDeferred<{ source: string; backend: string }>();
+    const updateDeferred = createDeferred<{ source: string; backend: string }>();
+    const promptDeferred = createDeferred<{ source: string; backend: string }>();
+
+    generateMock
+      .mockReturnValueOnce(initialDeferred.promise)
+      .mockReturnValueOnce(updateDeferred.promise)
+      .mockReturnValueOnce(promptDeferred.promise);
+
+    orchestrator.openWindow({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      instruction: 'Initial instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    initialDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 1);
+
+    orchestrator.requestUpdate({
+      sessionId,
+      windowId,
+      instruction: 'Update instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    updateDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 2);
+
+    const revisionTwoPrompt = orchestrator.getWindowRevisionPrompt(sessionId, windowId, 2);
+    const editedPrompt = revisionTwoPrompt.prompt.replace('Update instruction', 'Edited instruction');
+
+    orchestrator.requestPromptUpdate({
+      sessionId,
+      windowId,
+      prompt: editedPrompt
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(generateMock).toHaveBeenCalledTimes(3);
+    expect(generateMock.mock.calls[2]?.[0]).toMatchObject({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      reason: 'action',
+      instruction: 'Edited instruction'
+    });
+    expect(generateMock.mock.calls[2]?.[0]?.promptOverride).toContain('Previous module source:');
+    expect(generateMock.mock.calls[2]?.[0]?.promptOverride).toContain('Ready');
+    expect(generateMock.mock.calls[2]?.[0]?.promptOverride).toContain('Edited instruction');
+    expect(generateMock.mock.calls[2]?.[0]?.promptOverride).not.toContain('[redacted]');
+
+    promptDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 3);
+
+    const revisionThreePrompt = orchestrator.getWindowRevisionPrompt(sessionId, windowId, 3);
+    expect(revisionThreePrompt.prompt).toContain('[redacted]');
+    expect(revisionThreePrompt.prompt).not.toContain('Ready');
   });
 });

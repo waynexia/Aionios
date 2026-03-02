@@ -42,6 +42,62 @@ function pickUpdateStrategy(previousSource: string | undefined, nextSource: stri
   return hasDefaultWindowExport ? 'hmr' : 'remount';
 }
 
+function redactPreviousSource(prompt: string) {
+  const startMarker = 'Previous module source:';
+  const endMarker = 'Return only TSX module code.';
+  const startIndex = prompt.indexOf(startMarker);
+  if (startIndex === -1) {
+    return prompt;
+  }
+  const endIndex = prompt.indexOf(endMarker, startIndex);
+  const redacted = `${startMarker}\n[redacted]\n\n`;
+  if (endIndex === -1) {
+    return `${prompt.slice(0, startIndex)}${redacted}`.trimEnd();
+  }
+  return `${prompt.slice(0, startIndex)}${redacted}${prompt.slice(endIndex)}`.trimEnd();
+}
+
+function extractUserInstructionFromPrompt(prompt: string) {
+  const startMarker = 'User instruction for this update:';
+  const endMarker = '\nRecent context:';
+  const startIndex = prompt.indexOf(startMarker);
+  if (startIndex === -1) {
+    return undefined;
+  }
+  let contentStart = startIndex + startMarker.length;
+  if (prompt[contentStart] === '\r' && prompt[contentStart + 1] === '\n') {
+    contentStart += 2;
+  } else if (prompt[contentStart] === '\n') {
+    contentStart += 1;
+  }
+  const endIndex = prompt.indexOf(endMarker, contentStart);
+  const content = endIndex === -1 ? prompt.slice(contentStart) : prompt.slice(contentStart, endIndex);
+  const trimmed = content.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function hydrateRedactedPreviousSource(prompt: string, previousSource: string | undefined) {
+  if (!previousSource) {
+    return prompt;
+  }
+  const startMarker = 'Previous module source:';
+  const endMarker = 'Return only TSX module code.';
+  const startIndex = prompt.indexOf(startMarker);
+  if (startIndex === -1) {
+    return prompt;
+  }
+  const endIndex = prompt.indexOf(endMarker, startIndex);
+  if (endIndex === -1) {
+    return prompt;
+  }
+  const section = prompt.slice(startIndex, endIndex);
+  if (!section.includes('[redacted]')) {
+    return prompt;
+  }
+  const hydrated = `${startMarker}\n${previousSource}\n\n`;
+  return `${prompt.slice(0, startIndex)}${hydrated}${prompt.slice(endIndex)}`.trimEnd();
+}
+
 export class WindowOrchestrator {
   private readonly store = new SessionStore();
   private readonly eventBus = new SessionEventBus();
@@ -117,6 +173,17 @@ export class WindowOrchestrator {
       throw new Error(`Revision ${targetRevision} not found`);
     }
     return revision;
+  }
+
+  getWindowRevisionPrompt(sessionId: string, windowId: string, targetRevision: number) {
+    const revision = this.getWindowRevision(sessionId, windowId, targetRevision);
+    return {
+      revision: revision.revision,
+      generatedAt: revision.generatedAt,
+      backend: revision.backend,
+      strategy: revision.strategy,
+      prompt: redactPreviousSource(revision.prompt)
+    };
   }
 
   openWindow(input: OpenWindowInput): WindowSnapshot {
@@ -234,6 +301,52 @@ export class WindowOrchestrator {
     return this.getWindowSnapshot(input.sessionId, input.windowId);
   }
 
+  requestPromptUpdate(input: { sessionId: string; windowId: string; prompt: string }): WindowSnapshot {
+    const windowRecord = this.store.getWindow(input.sessionId, input.windowId);
+    if (!windowRecord) {
+      throw new Error(`Window ${input.sessionId}/${input.windowId} not found`);
+    }
+    if (isSystemApp(windowRecord.appId)) {
+      return this.getWindowSnapshot(input.sessionId, input.windowId);
+    }
+
+    const normalizedPrompt = input.prompt.trimEnd();
+    const instruction = extractUserInstructionFromPrompt(normalizedPrompt);
+    if (instruction) {
+      this.store.addContextEntry(
+        input.sessionId,
+        input.windowId,
+        createContextEntry('user', instruction)
+      );
+    } else {
+      this.store.addContextEntry(
+        input.sessionId,
+        input.windowId,
+        createContextEntry('user', '[Edited generation prompt]')
+      );
+    }
+
+    this.store.setLoading(input.sessionId, input.windowId);
+    this.eventBus.publish({
+      type: 'window-status',
+      sessionId: input.sessionId,
+      windowId: input.windowId,
+      status: 'loading'
+    });
+
+    void this.enqueueWindowTask(input.sessionId, input.windowId, async () => {
+      await this.generateRevision({
+        sessionId: input.sessionId,
+        windowId: input.windowId,
+        reason: 'action',
+        instruction,
+        promptOverride: normalizedPrompt
+      });
+    });
+
+    return this.getWindowSnapshot(input.sessionId, input.windowId);
+  }
+
   closeWindow(sessionId: string, windowId: string) {
     const deleted = this.store.deleteWindow(sessionId, windowId);
     return deleted;
@@ -330,12 +443,14 @@ export default function WindowApp() {
     sessionId,
     windowId,
     reason,
-    instruction
+    instruction,
+    promptOverride
   }: {
     sessionId: string;
     windowId: string;
     reason: 'initial' | 'action';
     instruction?: string;
+    promptOverride?: string;
   }) {
     const record = this.store.getWindow(sessionId, windowId);
     if (!record) {
@@ -343,6 +458,10 @@ export default function WindowApp() {
     }
 
     const previousSource = record.revisions.at(-1)?.source;
+    const hydratedPromptOverride =
+      typeof promptOverride === 'string' && promptOverride.trim().length > 0
+        ? hydrateRedactedPreviousSource(promptOverride, previousSource)
+        : undefined;
     const request = {
       sessionId,
       windowId,
@@ -350,6 +469,7 @@ export default function WindowApp() {
       title: record.title,
       reason,
       instruction,
+      promptOverride: hydratedPromptOverride,
       context: record.context,
       previousSource
     } as const;
