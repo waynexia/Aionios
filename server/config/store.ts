@@ -9,6 +9,9 @@ import {
   type PreferenceConfigPatch
 } from './types';
 
+const DEFAULT_SERVER_PORT = 5173;
+const DEFAULT_SERVER_DISABLE_HMR = false;
+const DEFAULT_LLM_BACKEND: LlmBackend = 'codex';
 const DEFAULT_CODEX_COMMAND = 'codex exec --skip-git-repo-check';
 const DEFAULT_CODEX_TIMEOUT_MS = 120_000;
 const DEFAULT_LLM_STREAM_OUTPUT = false;
@@ -17,7 +20,6 @@ const DEFAULT_CONFIG_RELATIVE_PATH = '.aionios/preferences.toml';
 interface PreferenceConfigStoreOptions {
   filePath?: string;
   defaults?: PreferenceConfig;
-  environment?: NodeJS.ProcessEnv;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -42,6 +44,19 @@ function parseTimeoutMs(value: unknown, fieldName: string): number {
         : Number.NaN;
   if (!Number.isInteger(numericValue) || numericValue <= 0) {
     throw new Error(`${fieldName} must be a positive integer.`);
+  }
+  return numericValue;
+}
+
+function parsePort(value: unknown, fieldName: string): number {
+  const numericValue =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isInteger(numericValue) || numericValue <= 0 || numericValue > 65535) {
+    throw new Error(`${fieldName} must be an integer between 1 and 65535.`);
   }
   return numericValue;
 }
@@ -81,6 +96,8 @@ function mergeConfig(base: PreferenceConfig, patch: PreferenceConfigPatch): Pref
     ...patch
   };
   return {
+    serverPort: parsePort(merged.serverPort, 'serverPort'),
+    serverDisableHmr: parseBoolean(merged.serverDisableHmr, 'serverDisableHmr'),
     llmBackend: parseBackend(merged.llmBackend, 'llmBackend'),
     codexCommand: parseNonEmptyString(merged.codexCommand, 'codexCommand'),
     codexTimeoutMs: parseTimeoutMs(merged.codexTimeoutMs, 'codexTimeoutMs'),
@@ -97,6 +114,14 @@ function parseUpdatePatch(input: unknown): PreferenceConfigPatch {
   const patch: PreferenceConfigPatch = {};
   for (const [key, value] of Object.entries(input)) {
     if (value === undefined) {
+      continue;
+    }
+    if (key === 'serverPort') {
+      patch.serverPort = parsePort(value, key);
+      continue;
+    }
+    if (key === 'serverDisableHmr') {
+      patch.serverDisableHmr = parseBoolean(value, key);
       continue;
     }
     if (key === 'llmBackend') {
@@ -132,13 +157,20 @@ function parseTomlConfig(rawToml: string): PreferenceConfigPatch {
   }
 
   for (const key of Object.keys(parsed)) {
-    if (key !== 'llm' && key !== 'terminal') {
+    if (key !== 'server' && key !== 'llm' && key !== 'terminal') {
       throw new Error(`Unknown config section "${key}".`);
     }
   }
 
+  const server = getTable(parsed, 'server');
   const llm = getTable(parsed, 'llm');
   const terminal = getTable(parsed, 'terminal');
+
+  for (const key of Object.keys(server)) {
+    if (key !== 'port' && key !== 'disable_hmr') {
+      throw new Error(`Unknown config field "server.${key}".`);
+    }
+  }
 
   for (const key of Object.keys(llm)) {
     if (key !== 'backend' && key !== 'codex_command' && key !== 'codex_timeout_ms' && key !== 'stream_output') {
@@ -153,6 +185,12 @@ function parseTomlConfig(rawToml: string): PreferenceConfigPatch {
   }
 
   const patch: PreferenceConfigPatch = {};
+  if (server.port !== undefined) {
+    patch.serverPort = parsePort(server.port, 'server.port');
+  }
+  if (server.disable_hmr !== undefined) {
+    patch.serverDisableHmr = parseBoolean(server.disable_hmr, 'server.disable_hmr');
+  }
   if (llm.backend !== undefined) {
     patch.llmBackend = parseBackend(llm.backend, 'llm.backend');
   }
@@ -174,6 +212,10 @@ function parseTomlConfig(rawToml: string): PreferenceConfigPatch {
 
 function serializeToml(config: PreferenceConfig) {
   return stringifyToml({
+    server: {
+      port: config.serverPort,
+      disable_hmr: config.serverDisableHmr
+    },
     llm: {
       backend: config.llmBackend,
       codex_command: config.codexCommand,
@@ -186,87 +228,36 @@ function serializeToml(config: PreferenceConfig) {
   });
 }
 
-function resolveEnvBackend(environment: NodeJS.ProcessEnv): LlmBackend {
-  const configured = environment.AIONIOS_LLM_BACKEND?.trim().toLowerCase();
-  if (configured === 'codex') {
-    return 'codex';
-  }
-  return 'mock';
-}
-
-function resolveEnvStreamOutput(environment: NodeJS.ProcessEnv): boolean {
-  const configured = environment.AIONIOS_LLM_STREAM_OUTPUT?.trim().toLowerCase();
-  if (!configured) {
-    return DEFAULT_LLM_STREAM_OUTPUT;
-  }
-  if (configured === '1' || configured === 'true' || configured === 'yes' || configured === 'on') {
-    return true;
-  }
-  if (configured === '0' || configured === 'false' || configured === 'no' || configured === 'off') {
-    return false;
-  }
-  return DEFAULT_LLM_STREAM_OUTPUT;
-}
-
-function resolveEnvTimeout(environment: NodeJS.ProcessEnv): number {
-  const configured = environment.AIONIOS_CODEX_TIMEOUT_MS;
-  if (configured === undefined) {
-    return DEFAULT_CODEX_TIMEOUT_MS;
-  }
-  const parsed = Number(configured);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    return DEFAULT_CODEX_TIMEOUT_MS;
-  }
-  return parsed;
-}
-
-function resolveEnvCodexCommand(environment: NodeJS.ProcessEnv): string {
-  const configured = environment.AIONIOS_CODEX_COMMAND?.trim();
-  return configured && configured.length > 0 ? configured : DEFAULT_CODEX_COMMAND;
-}
-
-function resolveEnvShell(environment: NodeJS.ProcessEnv): string {
-  const configured = environment.SHELL?.trim();
-  if (configured && configured.length > 0) {
-    return configured;
-  }
-
+function resolveDefaultShell(): string {
   if (process.platform === 'win32') {
-    return environment.ComSpec?.trim() || 'cmd.exe';
+    return 'cmd.exe';
   }
-
+  if (process.platform === 'darwin') {
+    return '/bin/zsh';
+  }
   const candidates = ['/bin/bash', '/usr/bin/bash', '/bin/sh'];
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
       return candidate;
     }
   }
-
   return 'sh';
 }
 
-export function resolvePreferenceDefaults(
-  environment: NodeJS.ProcessEnv = process.env
-): PreferenceConfig {
+export function resolvePreferenceDefaults(): PreferenceConfig {
   return {
-    llmBackend: resolveEnvBackend(environment),
-    codexCommand: resolveEnvCodexCommand(environment),
-    codexTimeoutMs: resolveEnvTimeout(environment),
-    llmStreamOutput: resolveEnvStreamOutput(environment),
-    terminalShell: resolveEnvShell(environment)
+    serverPort: DEFAULT_SERVER_PORT,
+    serverDisableHmr: DEFAULT_SERVER_DISABLE_HMR,
+    llmBackend: DEFAULT_LLM_BACKEND,
+    codexCommand: DEFAULT_CODEX_COMMAND,
+    codexTimeoutMs: DEFAULT_CODEX_TIMEOUT_MS,
+    llmStreamOutput: DEFAULT_LLM_STREAM_OUTPUT,
+    terminalShell: resolveDefaultShell()
   };
 }
 
-export function resolvePreferenceConfigPath(
-  environment: NodeJS.ProcessEnv = process.env
-): string {
-  const configuredPath = environment.AIONIOS_CONFIG_PATH?.trim();
-  if (!configuredPath) {
-    return path.resolve(process.cwd(), DEFAULT_CONFIG_RELATIVE_PATH);
-  }
-  return path.isAbsolute(configuredPath)
-    ? configuredPath
-    : path.resolve(process.cwd(), configuredPath);
+export function resolvePreferenceConfigPath(): string {
+  return path.resolve(process.cwd(), DEFAULT_CONFIG_RELATIVE_PATH);
 }
 
 export class PreferenceConfigStore {
@@ -274,9 +265,8 @@ export class PreferenceConfigStore {
   private config: PreferenceConfig;
 
   constructor(options: PreferenceConfigStoreOptions = {}) {
-    const environment = options.environment ?? process.env;
-    this.config = options.defaults ?? resolvePreferenceDefaults(environment);
-    this.filePath = options.filePath ?? resolvePreferenceConfigPath(environment);
+    this.config = options.defaults ?? resolvePreferenceDefaults();
+    this.filePath = options.filePath ?? resolvePreferenceConfigPath();
   }
 
   getConfig(): PreferenceConfig {

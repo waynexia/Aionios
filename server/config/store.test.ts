@@ -29,6 +29,8 @@ afterEach(async () => {
 
 describe('PreferenceConfigStore', () => {
   const defaults: PreferenceConfig = {
+    serverPort: 5173,
+    serverDisableHmr: false,
     llmBackend: 'mock',
     codexCommand: 'codex exec --skip-git-repo-check',
     codexTimeoutMs: 120_000,
@@ -47,6 +49,7 @@ describe('PreferenceConfigStore', () => {
     const persisted = await fs.readFile(configPath, 'utf8');
 
     expect(loaded).toEqual(defaults);
+    expect(persisted).toContain('[server]');
     expect(persisted).toContain('[llm]');
     expect(persisted).toContain('backend = "mock"');
     expect(persisted).toContain('[terminal]');
@@ -78,6 +81,8 @@ describe('PreferenceConfigStore', () => {
     const loaded = await store.load();
 
     expect(loaded).toEqual({
+      serverPort: defaults.serverPort,
+      serverDisableHmr: defaults.serverDisableHmr,
       llmBackend: 'codex',
       codexCommand: 'codex exec --model gpt-5',
       codexTimeoutMs: 64_000,
@@ -103,6 +108,8 @@ describe('PreferenceConfigStore', () => {
     const directoryEntries = await fs.readdir(tempDir);
 
     expect(updated).toEqual({
+      serverPort: defaults.serverPort,
+      serverDisableHmr: defaults.serverDisableHmr,
       llmBackend: 'codex',
       codexCommand: defaults.codexCommand,
       codexTimeoutMs: 45_000,
@@ -132,20 +139,15 @@ describe('PreferenceConfigStore', () => {
 });
 
 describe('resolvePreferenceDefaults', () => {
-  it('reads environment overrides with fallback safety', () => {
-    const resolved = resolvePreferenceDefaults({
-      AIONIOS_LLM_BACKEND: 'CoDeX',
-      AIONIOS_CODEX_COMMAND: 'codex exec --model gpt-5',
-      AIONIOS_CODEX_TIMEOUT_MS: '90000',
-      AIONIOS_LLM_STREAM_OUTPUT: '1',
-      SHELL: '/usr/bin/fish'
-    });
-    expect(resolved).toEqual({
-      llmBackend: 'codex',
-      codexCommand: 'codex exec --model gpt-5',
-      codexTimeoutMs: 90_000,
-      llmStreamOutput: true,
-      terminalShell: '/usr/bin/fish'
-    });
+  it('returns a complete default config object', () => {
+    const resolved = resolvePreferenceDefaults();
+    expect(resolved.serverPort).toBe(5173);
+    expect(resolved.serverDisableHmr).toBe(false);
+    expect(resolved.llmBackend).toBe('codex');
+    expect(resolved.codexCommand).toBe('codex exec --skip-git-repo-check');
+    expect(resolved.codexTimeoutMs).toBe(120_000);
+    expect(resolved.llmStreamOutput).toBe(false);
+    expect(typeof resolved.terminalShell).toBe('string');
+    expect(resolved.terminalShell.length).toBeGreaterThan(0);
   });
 });

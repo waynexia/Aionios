@@ -6,6 +6,8 @@ import { createLlmProvider } from './provider';
 
 function createConfig(overrides: Partial<PreferenceConfig> = {}): PreferenceConfig {
   return {
+    serverPort: 5173,
+    serverDisableHmr: false,
     llmBackend: 'mock',
     codexCommand: 'codex exec --skip-git-repo-check',
     codexTimeoutMs: 120_000,

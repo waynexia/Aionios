@@ -5,6 +5,8 @@ export type UpdateStrategy = 'hmr' | 'remount';
 export type LlmBackend = 'mock' | 'codex';
 
 export interface PreferenceConfig {
+  serverPort: number;
+  serverDisableHmr: boolean;
   llmBackend: LlmBackend;
   codexCommand: string;
   codexTimeoutMs: number;

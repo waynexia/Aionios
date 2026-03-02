@@ -127,15 +127,28 @@ export async function createCdpHarness(options = {}) {
   async function start() {
     console.log('[verify:cdp] temp dir:', tmpDir);
 
-    devServer = spawn('npm', ['run', 'dev'], {
+    await fsPromises.writeFile(
+      configPath,
+      [
+        '[server]',
+        `port = ${String(serverPort)}`,
+        'disable_hmr = true',
+        '',
+        '[llm]',
+        'backend = "mock"',
+        'codex_command = "codex exec --skip-git-repo-check"',
+        'codex_timeout_ms = 120000',
+        'stream_output = false',
+        '',
+        '[terminal]',
+        'shell = "/bin/bash"',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    devServer = spawn('npm', ['run', 'dev', '--', '--config-path', configPath], {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        PORT: String(serverPort),
-        AIONIOS_CONFIG_PATH: configPath,
-        AIONIOS_LLM_BACKEND: 'mock',
-        AIONIOS_DISABLE_HMR: '1'
-      },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     streamProcessOutput(devServer, path.join(logDir, 'dev-server.log'), 'dev-server');

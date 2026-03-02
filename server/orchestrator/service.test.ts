@@ -22,6 +22,8 @@ vi.mock('./llm/provider', () => ({
 import { WindowOrchestrator } from './service';
 
 const preferenceConfig: PreferenceConfig = {
+  serverPort: 5173,
+  serverDisableHmr: false,
   llmBackend: 'mock',
   codexCommand: 'codex exec --skip-git-repo-check',
   codexTimeoutMs: 120_000,

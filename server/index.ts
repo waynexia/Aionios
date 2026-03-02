@@ -11,19 +11,51 @@ import {
   createWindowModulePlugin
 } from './vite/window-module-plugin';
 
-const port = Number(process.env.PORT ?? 5173);
+function parseArgs(argv: string[]) {
+  let configPath: string | null = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--config-path' || arg === '--config') {
+      const value = argv[index + 1];
+      if (!value) {
+        throw new Error(`Missing value for ${arg}`);
+      }
+      configPath = value;
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--config-path=')) {
+      configPath = arg.slice('--config-path='.length);
+    }
+  }
+
+  const resolvedConfigPath =
+    configPath && configPath.trim().length > 0
+      ? path.isAbsolute(configPath)
+        ? configPath
+        : path.resolve(process.cwd(), configPath)
+      : null;
+
+  return {
+    configPath: resolvedConfigPath
+  };
+}
 
 async function startServer() {
   const app = express();
-  const preferenceConfigStore = new PreferenceConfigStore();
+  const args = parseArgs(process.argv.slice(2));
+  const preferenceConfigStore = new PreferenceConfigStore({
+    filePath: args.configPath ?? undefined
+  });
   await preferenceConfigStore.load();
+  const initialConfig = preferenceConfigStore.getConfig();
 
   const orchestrator = new WindowOrchestrator(() => preferenceConfigStore.getConfig());
   const terminalManager = new TerminalManager((event) => {
     orchestrator.publishSessionEvent(event);
   }, () => preferenceConfigStore.getConfig());
   const windowPlugin = createWindowModulePlugin(orchestrator);
-  const disableHmr = process.env.AIONIOS_DISABLE_HMR === '1';
+  const disableHmr = initialConfig.serverDisableHmr;
   const vite = await createViteServer({
     plugins: [windowPlugin],
     appType: 'custom',
@@ -395,8 +427,8 @@ async function startServer() {
     });
   });
 
-  const server = app.listen(port, () => {
-    console.log(`[aionios] dev server listening on http://localhost:${port}`);
+  const server = app.listen(initialConfig.serverPort, () => {
+    console.log(`[aionios] dev server listening on http://localhost:${initialConfig.serverPort}`);
   });
 
   attachTerminalWebSocketServer({

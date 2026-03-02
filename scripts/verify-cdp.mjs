@@ -5,6 +5,7 @@ function parseArgs(argv) {
   const selectedCases = [];
   let listCases = false;
   let cdpPort;
+  let headless;
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--list') {
@@ -41,12 +42,33 @@ function parseArgs(argv) {
     if (arg.startsWith('--cdp-port=')) {
       cdpPort = arg.slice('--cdp-port='.length);
     }
+    if (arg === '--headless') {
+      headless = true;
+      continue;
+    }
+    if (arg === '--headed' || arg === '--no-headless') {
+      headless = false;
+      continue;
+    }
+    if (arg.startsWith('--headless=')) {
+      const raw = arg.slice('--headless='.length).trim().toLowerCase();
+      if (raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on') {
+        headless = true;
+        continue;
+      }
+      if (raw === '0' || raw === 'false' || raw === 'no' || raw === 'off') {
+        headless = false;
+        continue;
+      }
+      throw new Error(`Invalid value for --headless: ${raw}`);
+    }
   }
 
   return {
     listCases,
     selectedCases: selectedCases.length > 0 ? selectedCases : null,
-    cdpPort
+    cdpPort,
+    headless
   };
 }
 
@@ -112,7 +134,7 @@ function resolveEnvPort(value) {
 }
 
 async function resolveCdpPort(argsPort) {
-  const candidate = argsPort ?? process.env.AIONIOS_CDP_PORT ?? process.env.CDP_PORT;
+  const candidate = argsPort;
   const resolved = resolveEnvPort(candidate);
   if (resolved === 'auto') {
     return getFreePort();
@@ -134,7 +156,7 @@ async function main() {
   const cdpPort = await resolveCdpPort(args.cdpPort);
   const harness = await createCdpHarness({
     cdpPort,
-    headless: process.env.AIONIOS_CDP_HEADLESS !== '0'
+    headless: args.headless ?? true
   });
 
   let ctx;

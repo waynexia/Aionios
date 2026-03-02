@@ -7,6 +7,8 @@ const PREFERENCE_WINDOW_SOURCE = `
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 
 type PreferenceConfig = {
+  serverPort: number;
+  serverDisableHmr: boolean;
   llmBackend: 'mock' | 'codex';
   codexCommand: string;
   codexTimeoutMs: number;
@@ -15,6 +17,8 @@ type PreferenceConfig = {
 };
 
 type PreferenceFormState = {
+  serverPort: string;
+  serverDisableHmr: boolean;
   llmBackend: 'mock' | 'codex';
   codexCommand: string;
   codexTimeoutMs: string;
@@ -38,6 +42,8 @@ type WindowProps = {
 
 function toFormState(config: PreferenceConfig): PreferenceFormState {
   return {
+    serverPort: String(config.serverPort),
+    serverDisableHmr: config.serverDisableHmr,
     llmBackend: config.llmBackend,
     codexCommand: config.codexCommand,
     codexTimeoutMs: String(config.codexTimeoutMs),
@@ -47,11 +53,17 @@ function toFormState(config: PreferenceConfig): PreferenceFormState {
 }
 
 function toConfig(form: PreferenceFormState): PreferenceConfig {
+  const serverPort = Number.parseInt(form.serverPort, 10);
+  if (!Number.isInteger(serverPort) || serverPort <= 0 || serverPort > 65535) {
+    throw new Error('Server port must be an integer between 1 and 65535.');
+  }
   const timeout = Number.parseInt(form.codexTimeoutMs, 10);
   if (!Number.isInteger(timeout) || timeout <= 0) {
     throw new Error('Timeout must be a positive integer in milliseconds.');
   }
   return {
+    serverPort,
+    serverDisableHmr: form.serverDisableHmr,
     llmBackend: form.llmBackend,
     codexCommand: form.codexCommand.trim(),
     codexTimeoutMs: timeout,
@@ -61,7 +73,9 @@ function toConfig(form: PreferenceFormState): PreferenceConfig {
 }
 
 const INITIAL_FORM_STATE: PreferenceFormState = {
-  llmBackend: 'mock',
+  serverPort: '5173',
+  serverDisableHmr: false,
+  llmBackend: 'codex',
   codexCommand: 'codex exec --skip-git-repo-check',
   codexTimeoutMs: '120000',
   llmStreamOutput: false,
@@ -131,10 +145,41 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       <header>
         <strong>{windowState.title}</strong>
         <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.8 }}>
-          Configure server-owned runtime preferences for LLM and terminal.
+          Configure server-owned runtime preferences. Server settings require restart to apply.
         </p>
       </header>
       <form onSubmit={onSubmit} data-pref-form style={{ display: 'grid', gap: 10 }}>
+        <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
+          <span>Server port</span>
+          <input
+            data-pref-field="server-port"
+            type="number"
+            min={1}
+            max={65535}
+            step={1}
+            value={form.serverPort}
+            disabled={loading || saving}
+            onChange={(event) => setForm((state) => ({ ...state, serverPort: event.target.value }))}
+            style={{
+              borderRadius: 8,
+              border: '1px solid rgba(148,163,184,0.4)',
+              background: 'rgba(15,23,42,0.85)',
+              color: '#e2e8f0',
+              padding: '8px 10px'
+            }}
+          />
+        </label>
+        <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+          <span>Disable Vite HMR (recommended for stability)</span>
+          <input
+            data-pref-field="server-disable-hmr"
+            type="checkbox"
+            checked={form.serverDisableHmr}
+            disabled={loading || saving}
+            onChange={(event) => setForm((state) => ({ ...state, serverDisableHmr: event.target.checked }))}
+            style={{ justifySelf: 'start' }}
+          />
+        </label>
         <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>
           <span>LLM backend</span>
           <select

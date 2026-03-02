@@ -34,20 +34,24 @@ Then open `http://localhost:5173`.
 - White variant (for dark surfaces): `icon-white.png`
 - Static favicon/PWA assets live in `public/` (including `public/icons/`).
 
-## LLM backend
+## Preferences
 
-- Runtime preferences are server-owned and persisted in TOML at `.aionios/preferences.toml` (override path with `AIONIOS_CONFIG_PATH`).
+- Runtime preferences are server-owned and persisted in TOML at `.aionios/preferences.toml`.
+- Override the config path with:
+
+```bash
+npm run dev -- --config-path /path/to/preferences.toml
+```
+
 - The Preference system app can edit:
+  - `serverPort` (restart required)
+  - `serverDisableHmr` (restart required)
   - `llmBackend` (`mock` or `codex`)
   - `codexCommand`
   - `codexTimeoutMs`
+  - `llmStreamOutput`
   - `terminalShell`
-- Environment variables (`AIONIOS_LLM_BACKEND`, `AIONIOS_CODEX_COMMAND`, `AIONIOS_CODEX_TIMEOUT_MS`) are used as initial defaults when no config file exists. (`terminalShell` seeds from `$SHELL` when present.)
-- Codex backend can still be bootstrapped via env defaults:
-
-```bash
-AIONIOS_LLM_BACKEND=codex AIONIOS_CODEX_COMMAND="codex exec --skip-git-repo-check" npm run dev
-```
+- Environment variables are not used for configuration.
 
 ## Quality checks
 

@@ -32,8 +32,8 @@ function buildSessionKey(sessionId: string, windowId: string) {
 }
 
 function resolveDefaultShell() {
-  if (process.env.SHELL) {
-    return process.env.SHELL;
+  if (process.platform === 'win32') {
+    return 'cmd.exe';
   }
   if (process.platform === 'darwin') {
     return '/bin/zsh';
