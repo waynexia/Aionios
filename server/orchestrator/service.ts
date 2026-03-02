@@ -555,6 +555,7 @@ export default function WindowApp() {
       typeof promptOverride === 'string' && promptOverride.trim().length > 0
         ? hydrateRedactedPreviousSource(promptOverride, previousSource)
         : undefined;
+    const config = this.readConfig();
     const request = {
       sessionId,
       windowId,
@@ -564,12 +565,26 @@ export default function WindowApp() {
       instruction,
       promptOverride: hydratedPromptOverride,
       context: record.context,
-      previousSource
+      previousSource,
+      onOutputChunk: config.llmStreamOutput
+        ? ({ stream, chunk }: { stream: 'stdout' | 'stderr'; chunk: string }) => {
+            if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+              return;
+            }
+            this.eventBus.publish({
+              type: 'llm-output',
+              sessionId,
+              windowId,
+              stream,
+              chunk
+            });
+          }
+        : undefined
     } as const;
 
     const prompt = buildGenerationPrompt(request);
     try {
-      const generated = await createLlmProvider(this.readConfig()).generate(request);
+      const generated = await createLlmProvider(config).generate(request);
       if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
         return;
       }

@@ -32,6 +32,7 @@ describe('PreferenceConfigStore', () => {
     llmBackend: 'mock',
     codexCommand: 'codex exec --skip-git-repo-check',
     codexTimeoutMs: 120_000,
+    llmStreamOutput: false,
     terminalShell: '/bin/sh'
   };
 
@@ -60,6 +61,7 @@ describe('PreferenceConfigStore', () => {
         'backend = "codex"',
         'codex_command = "codex exec --model gpt-5"',
         'codex_timeout_ms = 64000',
+        'stream_output = true',
         '',
         '[terminal]',
         'shell = "/usr/bin/zsh"',
@@ -79,6 +81,7 @@ describe('PreferenceConfigStore', () => {
       llmBackend: 'codex',
       codexCommand: 'codex exec --model gpt-5',
       codexTimeoutMs: 64_000,
+      llmStreamOutput: true,
       terminalShell: '/usr/bin/zsh'
     });
   });
@@ -103,6 +106,7 @@ describe('PreferenceConfigStore', () => {
       llmBackend: 'codex',
       codexCommand: defaults.codexCommand,
       codexTimeoutMs: 45_000,
+      llmStreamOutput: false,
       terminalShell: '/bin/bash'
     });
     expect(persisted).toContain('codex_timeout_ms = 45_000');
@@ -133,12 +137,14 @@ describe('resolvePreferenceDefaults', () => {
       AIONIOS_LLM_BACKEND: 'CoDeX',
       AIONIOS_CODEX_COMMAND: 'codex exec --model gpt-5',
       AIONIOS_CODEX_TIMEOUT_MS: '90000',
+      AIONIOS_LLM_STREAM_OUTPUT: '1',
       SHELL: '/usr/bin/fish'
     });
     expect(resolved).toEqual({
       llmBackend: 'codex',
       codexCommand: 'codex exec --model gpt-5',
       codexTimeoutMs: 90_000,
+      llmStreamOutput: true,
       terminalShell: '/usr/bin/fish'
     });
   });

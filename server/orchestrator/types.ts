@@ -62,6 +62,7 @@ export interface GenerateRequest {
   promptOverride?: string;
   context: ContextEntry[];
   previousSource?: string;
+  onOutputChunk?: (event: { stream: 'stdout' | 'stderr'; chunk: string }) => void;
 }
 
 export interface GenerateResult {
@@ -111,11 +112,20 @@ export interface TerminalExitEvent {
   signal: NodeJS.Signals | null;
 }
 
+export interface LlmOutputEvent {
+  type: 'llm-output';
+  sessionId: string;
+  windowId: string;
+  stream: 'stdout' | 'stderr';
+  chunk: string;
+}
+
 export type SessionEvent =
   | WindowEvent
   | TerminalStatusEvent
   | TerminalOutputEvent
-  | TerminalExitEvent;
+  | TerminalExitEvent
+  | LlmOutputEvent;
 
 export interface WindowSnapshot {
   sessionId: string;

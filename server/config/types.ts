@@ -6,6 +6,7 @@ export interface PreferenceConfig {
   llmBackend: LlmBackend;
   codexCommand: string;
   codexTimeoutMs: number;
+  llmStreamOutput: boolean;
   terminalShell: string;
 }
 

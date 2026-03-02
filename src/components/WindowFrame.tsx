@@ -30,6 +30,7 @@ interface WindowFrameProps {
   onMinimize: () => void;
   onRequestUpdate?: () => void;
   onRequestHistory?: () => void;
+  onRequestLlmOutput?: () => void;
   children: ReactNode;
 }
 
@@ -44,6 +45,7 @@ export function WindowFrame({
   onMinimize,
   onRequestUpdate,
   onRequestHistory,
+  onRequestLlmOutput,
   children
 }: WindowFrameProps) {
   const frameRef = useRef<HTMLElement | null>(null);
@@ -204,6 +206,17 @@ export function WindowFrame({
               }
             >
               🕘
+            </button>
+          ) : null}
+          {onRequestLlmOutput ? (
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => onRequestLlmOutput()}
+              aria-label="Show LLM output"
+              title="LLM output"
+            >
+              📡
             </button>
           ) : null}
           {onRequestUpdate ? (

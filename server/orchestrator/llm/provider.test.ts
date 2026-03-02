@@ -9,6 +9,7 @@ function createConfig(overrides: Partial<PreferenceConfig> = {}): PreferenceConf
     llmBackend: 'mock',
     codexCommand: 'codex exec --skip-git-repo-check',
     codexTimeoutMs: 120_000,
+    llmStreamOutput: false,
     terminalShell: '/bin/bash',
     ...overrides
   };

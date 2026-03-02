@@ -21,6 +21,7 @@ const preferenceConfig: PreferenceConfig = {
   llmBackend: 'mock',
   codexCommand: 'codex exec --skip-git-repo-check',
   codexTimeoutMs: 120_000,
+  llmStreamOutput: false,
   terminalShell: '/bin/bash'
 };
 

@@ -11,6 +11,7 @@ import {
 
 const DEFAULT_CODEX_COMMAND = 'codex exec --skip-git-repo-check';
 const DEFAULT_CODEX_TIMEOUT_MS = 120_000;
+const DEFAULT_LLM_STREAM_OUTPUT = false;
 const DEFAULT_CONFIG_RELATIVE_PATH = '.aionios/preferences.toml';
 
 interface PreferenceConfigStoreOptions {
@@ -45,6 +46,13 @@ function parseTimeoutMs(value: unknown, fieldName: string): number {
   return numericValue;
 }
 
+function parseBoolean(value: unknown, fieldName: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new Error(`${fieldName} must be a boolean.`);
+  }
+  return value;
+}
+
 function parseBackend(value: unknown, fieldName: string): LlmBackend {
   if (typeof value !== 'string') {
     throw new Error(`${fieldName} must be one of ${LLM_BACKENDS.join(', ')}.`);
@@ -76,6 +84,7 @@ function mergeConfig(base: PreferenceConfig, patch: PreferenceConfigPatch): Pref
     llmBackend: parseBackend(merged.llmBackend, 'llmBackend'),
     codexCommand: parseNonEmptyString(merged.codexCommand, 'codexCommand'),
     codexTimeoutMs: parseTimeoutMs(merged.codexTimeoutMs, 'codexTimeoutMs'),
+    llmStreamOutput: parseBoolean(merged.llmStreamOutput, 'llmStreamOutput'),
     terminalShell: parseNonEmptyString(merged.terminalShell, 'terminalShell')
   };
 }
@@ -100,6 +109,10 @@ function parseUpdatePatch(input: unknown): PreferenceConfigPatch {
     }
     if (key === 'codexTimeoutMs') {
       patch.codexTimeoutMs = parseTimeoutMs(value, key);
+      continue;
+    }
+    if (key === 'llmStreamOutput') {
+      patch.llmStreamOutput = parseBoolean(value, key);
       continue;
     }
     if (key === 'terminalShell') {
@@ -128,7 +141,7 @@ function parseTomlConfig(rawToml: string): PreferenceConfigPatch {
   const terminal = getTable(parsed, 'terminal');
 
   for (const key of Object.keys(llm)) {
-    if (key !== 'backend' && key !== 'codex_command' && key !== 'codex_timeout_ms') {
+    if (key !== 'backend' && key !== 'codex_command' && key !== 'codex_timeout_ms' && key !== 'stream_output') {
       throw new Error(`Unknown config field "llm.${key}".`);
     }
   }
@@ -149,6 +162,9 @@ function parseTomlConfig(rawToml: string): PreferenceConfigPatch {
   if (llm.codex_timeout_ms !== undefined) {
     patch.codexTimeoutMs = parseTimeoutMs(llm.codex_timeout_ms, 'llm.codex_timeout_ms');
   }
+  if (llm.stream_output !== undefined) {
+    patch.llmStreamOutput = parseBoolean(llm.stream_output, 'llm.stream_output');
+  }
   if (terminal.shell !== undefined) {
     patch.terminalShell = parseNonEmptyString(terminal.shell, 'terminal.shell');
   }
@@ -161,7 +177,8 @@ function serializeToml(config: PreferenceConfig) {
     llm: {
       backend: config.llmBackend,
       codex_command: config.codexCommand,
-      codex_timeout_ms: config.codexTimeoutMs
+      codex_timeout_ms: config.codexTimeoutMs,
+      stream_output: config.llmStreamOutput
     },
     terminal: {
       shell: config.terminalShell
@@ -175,6 +192,20 @@ function resolveEnvBackend(environment: NodeJS.ProcessEnv): LlmBackend {
     return 'codex';
   }
   return 'mock';
+}
+
+function resolveEnvStreamOutput(environment: NodeJS.ProcessEnv): boolean {
+  const configured = environment.AIONIOS_LLM_STREAM_OUTPUT?.trim().toLowerCase();
+  if (!configured) {
+    return DEFAULT_LLM_STREAM_OUTPUT;
+  }
+  if (configured === '1' || configured === 'true' || configured === 'yes' || configured === 'on') {
+    return true;
+  }
+  if (configured === '0' || configured === 'false' || configured === 'no' || configured === 'off') {
+    return false;
+  }
+  return DEFAULT_LLM_STREAM_OUTPUT;
 }
 
 function resolveEnvTimeout(environment: NodeJS.ProcessEnv): number {
@@ -221,6 +252,7 @@ export function resolvePreferenceDefaults(
     llmBackend: resolveEnvBackend(environment),
     codexCommand: resolveEnvCodexCommand(environment),
     codexTimeoutMs: resolveEnvTimeout(environment),
+    llmStreamOutput: resolveEnvStreamOutput(environment),
     terminalShell: resolveEnvShell(environment)
   };
 }

@@ -8,6 +8,7 @@ export interface PreferenceConfig {
   llmBackend: LlmBackend;
   codexCommand: string;
   codexTimeoutMs: number;
+  llmStreamOutput: boolean;
   terminalShell: string;
 }
 
@@ -131,10 +132,11 @@ export type ServerEventType =
   | 'window-remount'
   | 'terminal-status'
   | 'terminal-output'
-  | 'terminal-exit';
+  | 'terminal-exit'
+  | 'llm-output';
 
 export interface ServerWindowLifecycleEvent {
-  type: Exclude<ServerEventType, 'terminal-status' | 'terminal-output' | 'terminal-exit'>;
+  type: 'window-status' | 'window-ready' | 'window-updated' | 'window-error' | 'window-remount';
   sessionId: string;
   windowId: string;
   appId?: string;
@@ -171,8 +173,17 @@ export interface ServerTerminalExitEvent {
   signal: string | null;
 }
 
+export interface ServerLlmOutputEvent {
+  type: 'llm-output';
+  sessionId: string;
+  windowId: string;
+  stream: 'stdout' | 'stderr';
+  chunk: string;
+}
+
 export type ServerWindowEvent =
   | ServerWindowLifecycleEvent
   | ServerTerminalStatusEvent
   | ServerTerminalOutputEvent
-  | ServerTerminalExitEvent;
+  | ServerTerminalExitEvent
+  | ServerLlmOutputEvent;

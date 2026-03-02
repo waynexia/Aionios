@@ -169,25 +169,26 @@ export default {
       throw new Error(`Unable to resolve initial LLM revision: ${String(initialRevision)}`);
     }
 
-    const initialSummary = await ctx.evaluate(
-      `(() => {
-        const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
-        if (!(frame instanceof HTMLElement)) return '';
-        const paragraphs = Array.from(frame.querySelectorAll('p'));
-        for (const paragraph of paragraphs) {
-          const text = paragraph.textContent?.trim() ?? '';
-          if (text.includes('Last instruction:')) {
-            return text;
-          }
-        }
-        return '';
-      })()`
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
+              const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+              if (!(frame instanceof HTMLElement)) return false;
+              const paragraphs = Array.from(frame.querySelectorAll('p'));
+              for (const paragraph of paragraphs) {
+                const text = paragraph.textContent?.trim() ?? '';
+                if (text.includes('Last instruction:') && text.includes('tag picker')) {
+                  return true;
+                }
+              }
+              return false;
+            })()`
+          )
+        ),
+      'Expected initial open-with-prompt summary to reflect prompt'
     );
-    if (!initialSummary.includes('Last instruction:') || !initialSummary.includes('tag picker')) {
-      throw new Error(
-        `Expected initial open-with-prompt summary to reflect prompt, got: ${JSON.stringify(initialSummary)}`
-      );
-    }
 
     const clicked = await ctx.evaluate(
       `(() => {

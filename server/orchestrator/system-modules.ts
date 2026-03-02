@@ -10,6 +10,7 @@ type PreferenceConfig = {
   llmBackend: 'mock' | 'codex';
   codexCommand: string;
   codexTimeoutMs: number;
+  llmStreamOutput: boolean;
   terminalShell: string;
 };
 
@@ -17,6 +18,7 @@ type PreferenceFormState = {
   llmBackend: 'mock' | 'codex';
   codexCommand: string;
   codexTimeoutMs: string;
+  llmStreamOutput: boolean;
   terminalShell: string;
 };
 
@@ -39,6 +41,7 @@ function toFormState(config: PreferenceConfig): PreferenceFormState {
     llmBackend: config.llmBackend,
     codexCommand: config.codexCommand,
     codexTimeoutMs: String(config.codexTimeoutMs),
+    llmStreamOutput: config.llmStreamOutput,
     terminalShell: config.terminalShell
   };
 }
@@ -52,6 +55,7 @@ function toConfig(form: PreferenceFormState): PreferenceConfig {
     llmBackend: form.llmBackend,
     codexCommand: form.codexCommand.trim(),
     codexTimeoutMs: timeout,
+    llmStreamOutput: form.llmStreamOutput,
     terminalShell: form.terminalShell.trim()
   };
 }
@@ -60,6 +64,7 @@ const INITIAL_FORM_STATE: PreferenceFormState = {
   llmBackend: 'mock',
   codexCommand: 'codex exec --skip-git-repo-check',
   codexTimeoutMs: '120000',
+  llmStreamOutput: false,
   terminalShell: '/bin/sh'
 };
 
@@ -182,6 +187,17 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               color: '#e2e8f0',
               padding: '8px 10px'
             }}
+          />
+        </label>
+        <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>
+          <span>Stream backend output (experimental)</span>
+          <input
+            data-pref-field="llm-stream-output"
+            type="checkbox"
+            checked={form.llmStreamOutput}
+            disabled={loading || saving}
+            onChange={(event) => setForm((state) => ({ ...state, llmStreamOutput: event.target.checked }))}
+            style={{ justifySelf: 'start' }}
           />
         </label>
         <label style={{ display: 'grid', gap: 4, fontSize: 13 }}>

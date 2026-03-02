@@ -17,6 +17,7 @@ import { DesktopIcons } from './components/DesktopIcons';
 import { Taskbar } from './components/Taskbar';
 import { PromptDialog } from './components/PromptDialog';
 import { RevisionDialog } from './components/RevisionDialog';
+import { LlmOutputDialog } from './components/LlmOutputDialog';
 import { WindowFrame } from './components/WindowFrame';
 import { WindowRuntime } from './components/WindowRuntime';
 import type {
@@ -34,7 +35,8 @@ type TerminalServerEvent = Extract<
   ServerWindowEvent,
   { type: 'terminal-status' | 'terminal-output' | 'terminal-exit' }
 >;
-type WindowServerEvent = Exclude<ServerWindowEvent, TerminalServerEvent>;
+type LlmServerEvent = Extract<ServerWindowEvent, { type: 'llm-output' }>;
+type WindowServerEvent = Exclude<ServerWindowEvent, TerminalServerEvent | LlmServerEvent>;
 
 interface AppState {
   sessionId?: string;
@@ -44,6 +46,7 @@ interface AppState {
   nextZIndex: number;
   files: Record<string, HostFileEntry>;
   terminals: Record<string, TerminalStateSnapshot>;
+  llmOutputs: Record<string, string>;
 }
 
 interface CanvasDimensions {
@@ -97,12 +100,17 @@ type AppAction =
       event: ServerWindowEvent;
     }
   | {
+      type: 'llm-output-clear';
+      windowId: string;
+    }
+  | {
       type: 'file-write';
       path: string;
       content: string;
     };
 
 const MAX_TERMINAL_BUFFER_CHARS = 40_000;
+const MAX_LLM_OUTPUT_BUFFER_CHARS = 80_000;
 const DEFAULT_WINDOW_WIDTH = 760;
 const DEFAULT_WINDOW_HEIGHT = 520;
 const WINDOW_CASCADE_X = 30;
@@ -114,7 +122,8 @@ export const initialState: AppState = {
   windows: [],
   nextZIndex: 10,
   files: {},
-  terminals: {}
+  terminals: {},
+  llmOutputs: {}
 };
 
 function maximizeZIndex(state: AppState, windowId: string): AppState {
@@ -144,6 +153,13 @@ function normalizeTerminalBuffer(buffer: string) {
     return buffer;
   }
   return buffer.slice(buffer.length - MAX_TERMINAL_BUFFER_CHARS);
+}
+
+function normalizeLlmOutputBuffer(buffer: string) {
+  if (buffer.length <= MAX_LLM_OUTPUT_BUFFER_CHARS) {
+    return buffer;
+  }
+  return buffer.slice(buffer.length - MAX_LLM_OUTPUT_BUFFER_CHARS);
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -263,6 +279,13 @@ function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
 
   return {
     ...state,
+    llmOutputs:
+      event.type === 'window-status' && status === 'loading'
+        ? {
+            ...state.llmOutputs,
+            [event.windowId]: ''
+          }
+        : state.llmOutputs,
     windows: updateWindow(state.windows, event.windowId, (windowItem) => {
       if (typeof event.revision === 'number' && event.revision < windowItem.revision) {
         return windowItem;
@@ -290,9 +313,24 @@ function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
   };
 }
 
+function applyLlmEvent(state: AppState, event: LlmServerEvent): AppState {
+  const current = state.llmOutputs[event.windowId] ?? '';
+  const next = normalizeLlmOutputBuffer(`${current}${event.chunk ?? ''}`);
+  return {
+    ...state,
+    llmOutputs: {
+      ...state.llmOutputs,
+      [event.windowId]: next
+    }
+  };
+}
+
 function applyServerEvent(state: AppState, event: ServerWindowEvent): AppState {
   if (event.type === 'terminal-status' || event.type === 'terminal-output' || event.type === 'terminal-exit') {
     return applyTerminalEvent(state, event);
+  }
+  if (event.type === 'llm-output') {
+    return applyLlmEvent(state, event);
   }
   return applyWindowEvent(state, event);
 }
@@ -337,6 +375,10 @@ export function reducer(state: AppState, action: AppAction): AppState {
         focusedWindowId: action.windowId,
         nextZIndex: nextZ,
         windows: [...state.windows, nextWindow],
+        llmOutputs: {
+          ...state.llmOutputs,
+          [action.windowId]: ''
+        },
         terminals:
           action.appId === 'terminal'
             ? {
@@ -354,10 +396,13 @@ export function reducer(state: AppState, action: AppAction): AppState {
     case 'window-close': {
       const nextTerminals = { ...state.terminals };
       delete nextTerminals[action.windowId];
+      const nextLlmOutputs = { ...state.llmOutputs };
+      delete nextLlmOutputs[action.windowId];
       return {
         ...state,
         windows: state.windows.filter((windowItem) => windowItem.windowId !== action.windowId),
         terminals: nextTerminals,
+        llmOutputs: nextLlmOutputs,
         focusedWindowId:
           state.focusedWindowId === action.windowId ? undefined : state.focusedWindowId
       };
@@ -403,6 +448,14 @@ export function reducer(state: AppState, action: AppAction): AppState {
       };
     case 'window-server-event':
       return applyServerEvent(state, action.event);
+    case 'llm-output-clear':
+      return {
+        ...state,
+        llmOutputs: {
+          ...state.llmOutputs,
+          [action.windowId]: ''
+        }
+      };
     case 'file-write': {
       return {
         ...state,
@@ -462,6 +515,10 @@ export default function App() {
     | { windowId: string; title: string }
     | null
   >(null);
+  const [llmOutputDialog, setLlmOutputDialog] = useState<
+    | { windowId: string; title: string }
+    | null
+  >(null);
 
   useEffect(() => {
     filesRef.current = state.files;
@@ -477,6 +534,16 @@ export default function App() {
     }
     setRevisionDialog(null);
   }, [revisionDialog, state.windows]);
+
+  useEffect(() => {
+    if (!llmOutputDialog) {
+      return;
+    }
+    if (state.windows.some((windowItem) => windowItem.windowId === llmOutputDialog.windowId)) {
+      return;
+    }
+    setLlmOutputDialog(null);
+  }, [llmOutputDialog, state.windows]);
 
   useEffect(() => {
     let active = true;
@@ -522,7 +589,8 @@ export default function App() {
       'window-remount',
       'terminal-status',
       'terminal-output',
-      'terminal-exit'
+      'terminal-exit',
+      'llm-output'
     ];
     for (const type of eventTypes) {
       events.addEventListener(type, listener as EventListener);
@@ -845,6 +913,10 @@ export default function App() {
     ? state.windows.find((windowItem) => windowItem.windowId === revisionDialog.windowId)
     : undefined;
 
+  const llmOutputDialogWindow = llmOutputDialog
+    ? state.windows.find((windowItem) => windowItem.windowId === llmOutputDialog.windowId)
+    : undefined;
+
   return (
     <div
       className="desktop-shell"
@@ -956,6 +1028,15 @@ export default function App() {
                     ? undefined
                     : () =>
                         setRevisionDialog({
+                          windowId: windowItem.windowId,
+                          title: windowItem.title
+                        })
+                }
+                onRequestLlmOutput={
+                  getAppDefinition(windowItem.appId)?.kind === 'system'
+                    ? undefined
+                    : () =>
+                        setLlmOutputDialog({
                           windowId: windowItem.windowId,
                           title: windowItem.title
                         })
@@ -1082,6 +1163,24 @@ export default function App() {
             void requestUpdateForWindow(promptDialog.windowId, instruction);
           }
           setPromptDialog(null);
+        }}
+      />
+      <LlmOutputDialog
+        open={Boolean(llmOutputDialog)}
+        windowId={llmOutputDialog?.windowId ?? ''}
+        title={llmOutputDialog?.title ?? ''}
+        windowStatus={llmOutputDialogWindow?.status ?? 'ready'}
+        output={
+          llmOutputDialog?.windowId
+            ? (state.llmOutputs[llmOutputDialog.windowId] ?? '')
+            : ''
+        }
+        onClose={() => setLlmOutputDialog(null)}
+        onClear={() => {
+          if (!llmOutputDialog) {
+            return;
+          }
+          dispatch({ type: 'llm-output-clear', windowId: llmOutputDialog.windowId });
         }}
       />
       <RevisionDialog
