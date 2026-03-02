@@ -193,10 +193,15 @@ export function WindowFrame({
           {onRequestHistory ? (
             <button
               type="button"
+              disabled={windowItem.status === 'loading'}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => onRequestHistory()}
               aria-label="Show revision history"
-              title="Revision history"
+              title={
+                windowItem.status === 'loading'
+                  ? 'Revision history is unavailable while updating.'
+                  : 'Revision history'
+              }
             >
               🕘
             </button>

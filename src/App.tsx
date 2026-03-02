@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
+  branchWindowRevision,
   closeWindow,
   createSession,
   getPreferenceConfig,
@@ -745,6 +746,34 @@ export default function App() {
     [state.sessionId]
   );
 
+  const branchWindowFromRevision = useCallback(
+    async (sourceWindowId: string, revision: number) => {
+      if (!state.sessionId) {
+        throw new Error('No active session.');
+      }
+      const newWindowId = randomWindowId();
+      const canvas = getWindowCanvasDimensions();
+      const snapshot = await branchWindowRevision({
+        sessionId: state.sessionId,
+        windowId: sourceWindowId,
+        revision,
+        newWindowId
+      });
+      dispatch({
+        type: 'window-open-local',
+        windowId: newWindowId,
+        sessionId: snapshot.sessionId,
+        appId: snapshot.appId,
+        title: snapshot.title,
+        initialStatus: snapshot.status,
+        initialRevision: snapshot.revision,
+        initialError: snapshot.error,
+        canvas
+      });
+    },
+    [getWindowCanvasDimensions, state.sessionId]
+  );
+
   const orderedWindows = useMemo(
     () => [...state.windows].sort((left, right) => left.zIndex - right.zIndex),
     [state.windows]
@@ -811,6 +840,10 @@ export default function App() {
   if (!activeSessionId) {
     return <div className="booting-shell">Aionios is booting...</div>;
   }
+
+  const revisionDialogWindow = revisionDialog
+    ? state.windows.find((windowItem) => windowItem.windowId === revisionDialog.windowId)
+    : undefined;
 
   return (
     <div
@@ -1056,13 +1089,15 @@ export default function App() {
         sessionId={activeSessionId}
         windowId={revisionDialog?.windowId ?? ''}
         title={revisionDialog?.title ?? ''}
-        currentRevision={
-          revisionDialog
-            ? state.windows.find((windowItem) => windowItem.windowId === revisionDialog.windowId)?.revision ??
-              0
-            : 0
-        }
+        currentRevision={revisionDialogWindow?.revision ?? 0}
+        windowStatus={revisionDialogWindow?.status ?? 'ready'}
         onClose={() => setRevisionDialog(null)}
+        onBranch={async (revision) => {
+          if (!revisionDialog) {
+            throw new Error('Revision dialog is not active.');
+          }
+          await branchWindowFromRevision(revisionDialog.windowId, revision);
+        }}
       />
     </div>
   );

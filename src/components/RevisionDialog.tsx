@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getWindowRevisionPrompt,
   listWindowRevisions,
+  regenerateWindowRevision,
   requestWindowPromptUpdate,
   rollbackWindow
 } from '../api/client';
-import type { WindowRevisionSummary } from '../types';
+import type { ClientWindowStatus, WindowRevisionSummary } from '../types';
 
 interface RevisionDialogProps {
   open: boolean;
@@ -13,7 +14,9 @@ interface RevisionDialogProps {
   windowId: string;
   title: string;
   currentRevision: number;
+  windowStatus: ClientWindowStatus;
   onClose: () => void;
+  onBranch: (revision: number) => Promise<void>;
 }
 
 function sortByRevisionDesc(revisions: WindowRevisionSummary[]) {
@@ -34,13 +37,17 @@ export function RevisionDialog({
   windowId,
   title,
   currentRevision,
-  onClose
+  windowStatus,
+  onClose,
+  onBranch
 }: RevisionDialogProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(false);
   const [revisions, setRevisions] = useState<WindowRevisionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [rollingBackTo, setRollingBackTo] = useState<number | null>(null);
+  const [branchingRevision, setBranchingRevision] = useState<number | null>(null);
+  const [regeneratingRevision, setRegeneratingRevision] = useState<number | null>(null);
   const [promptRevision, setPromptRevision] = useState<number | null>(null);
   const [promptLoaded, setPromptLoaded] = useState<string>('');
   const [promptDraft, setPromptDraft] = useState<string>('');
@@ -51,6 +58,7 @@ export function RevisionDialog({
 
   const orderedRevisions = useMemo(() => sortByRevisionDesc(revisions), [revisions]);
   const hasRevisions = orderedRevisions.length > 0;
+  const windowIsLoading = windowStatus === 'loading';
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -108,6 +116,8 @@ export function RevisionDialog({
     setPromptLoading(false);
     setPromptEditing(false);
     setPromptSubmitting(false);
+    setBranchingRevision(null);
+    setRegeneratingRevision(null);
   }, [open]);
 
   const viewPrompt = useCallback(
@@ -215,6 +225,7 @@ export function RevisionDialog({
 
         <p className="revision-dialog__description">
           Roll back to a previous revision. This will discard later revisions.
+          {windowIsLoading ? ' Rollback is disabled while this window is updating.' : null}
         </p>
 
         <section className="revision-dialog__list" data-revision-dialog-list>
@@ -255,7 +266,12 @@ export function RevisionDialog({
                       type="button"
                       className="revision-dialog__button revision-dialog__button--ghost"
                       data-revision-prompt={revision.revision}
-                      disabled={rollingBackTo !== null || loading}
+                      disabled={
+                        rollingBackTo !== null ||
+                        branchingRevision !== null ||
+                        regeneratingRevision !== null ||
+                        loading
+                      }
                       onClick={() => {
                         void viewPrompt(revision.revision);
                       }}
@@ -264,9 +280,69 @@ export function RevisionDialog({
                     </button>
                     <button
                       type="button"
+                      className="revision-dialog__button revision-dialog__button--ghost"
+                      data-revision-regenerate={revision.revision}
+                      disabled={
+                        rollingBackTo !== null ||
+                        branchingRevision !== null ||
+                        regeneratingRevision !== null ||
+                        loading ||
+                        windowIsLoading
+                      }
+                      onClick={async () => {
+                        setRegeneratingRevision(revision.revision);
+                        setError(null);
+                        try {
+                          await regenerateWindowRevision({
+                            sessionId,
+                            windowId,
+                            revision: revision.revision
+                          });
+                        } catch (reason) {
+                          setError((reason as Error).message);
+                        } finally {
+                          setRegeneratingRevision(null);
+                        }
+                      }}
+                    >
+                      {regeneratingRevision === revision.revision ? 'Regenerating...' : 'Regenerate'}
+                    </button>
+                    <button
+                      type="button"
+                      className="revision-dialog__button revision-dialog__button--ghost"
+                      data-revision-branch={revision.revision}
+                      disabled={
+                        rollingBackTo !== null ||
+                        branchingRevision !== null ||
+                        regeneratingRevision !== null ||
+                        loading
+                      }
+                      onClick={async () => {
+                        setBranchingRevision(revision.revision);
+                        setError(null);
+                        try {
+                          await onBranch(revision.revision);
+                        } catch (reason) {
+                          setError((reason as Error).message);
+                        } finally {
+                          setBranchingRevision(null);
+                        }
+                      }}
+                    >
+                      {branchingRevision === revision.revision ? 'Branching...' : 'Branch'}
+                    </button>
+                    <button
+                      type="button"
                       className="revision-dialog__button"
                       data-revision-rollback={revision.revision}
-                      disabled={isCurrent || rollingBackTo !== null}
+                      disabled={
+                        isCurrent ||
+                        rollingBackTo !== null ||
+                        branchingRevision !== null ||
+                        regeneratingRevision !== null ||
+                        loading ||
+                        windowIsLoading
+                      }
                       onClick={async () => {
                         setRollingBackTo(revision.revision);
                         setError(null);

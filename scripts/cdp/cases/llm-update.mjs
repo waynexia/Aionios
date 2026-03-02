@@ -405,6 +405,114 @@ export default {
       throw new Error('Unable to close prompt viewer');
     }
 
+    const revisionBeforeListRegenerate = await ctx.evaluate(getRevisionExpression(windowId));
+    if (typeof revisionBeforeListRegenerate !== 'number' || revisionBeforeListRegenerate <= 0) {
+      throw new Error(
+        `Unable to resolve revision before list regenerate: ${String(revisionBeforeListRegenerate)}`
+      );
+    }
+
+    const listRegenerateClicked = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-regenerate="${revisionBeforeListRegenerate}"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!listRegenerateClicked) {
+      throw new Error(`Unable to click list regenerate for revision ${String(revisionBeforeListRegenerate)}`);
+    }
+
+    await ctx.waitFor(
+      async () => {
+        const status = await getTaskbarStatus(ctx, windowId);
+        if (status !== 'ready') {
+          return false;
+        }
+        const revision = await ctx.evaluate(getRevisionExpression(windowId));
+        return typeof revision === 'number' && revision > revisionBeforeListRegenerate;
+      },
+      'LLM window did not update after list regenerate'
+    );
+
+    const windowIdsBeforeBranch = await ctx.evaluate(
+      `Array.from(document.querySelectorAll(${JSON.stringify(
+        `.window-frame[data-app-id="${appId}"]`
+      )})).map((frame) => frame.getAttribute('data-window-id')).filter(Boolean)`
+    );
+
+    const branchClicked = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-branch="1"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!branchClicked) {
+      throw new Error('Unable to branch from revision 1');
+    }
+
+    let branchedWindowId = null;
+    await ctx.waitFor(
+      async () => {
+        branchedWindowId = await ctx.evaluate(
+          `(() => {
+            const existing = new Set(${JSON.stringify(windowIdsBeforeBranch)});
+            const frames = Array.from(document.querySelectorAll(${JSON.stringify(
+              `.window-frame[data-app-id="${appId}"]`
+            )}));
+            for (const frame of frames) {
+              if (!(frame instanceof HTMLElement)) continue;
+              const id = frame.dataset.windowId;
+              if (!id) continue;
+              if (existing.has(id)) continue;
+              return id;
+            }
+            return null;
+          })()`
+        );
+        return typeof branchedWindowId === 'string' && branchedWindowId.length > 0;
+      },
+      'Branched window did not open'
+    );
+    if (typeof branchedWindowId !== 'string' || branchedWindowId.length === 0) {
+      throw new Error(`Unable to resolve branched window id: ${String(branchedWindowId)}`);
+    }
+
+    await ctx.waitFor(
+      async () => {
+        const status = await getTaskbarStatus(ctx, branchedWindowId);
+        if (status !== 'ready') {
+          return false;
+        }
+        const revision = await ctx.evaluate(getRevisionExpression(branchedWindowId));
+        return revision === 1;
+      },
+      'Branched window did not load revision 1'
+    );
+
+    const branchedSummary = await ctx.evaluate(
+      `(() => {
+        const frame = document.querySelector('.window-frame[data-window-id="${branchedWindowId}"]');
+        if (!(frame instanceof HTMLElement)) return '';
+        const paragraphs = Array.from(frame.querySelectorAll('p'));
+        for (const paragraph of paragraphs) {
+          const text = paragraph.textContent?.trim() ?? '';
+          if (text.includes('Last instruction:')) {
+            return text;
+          }
+        }
+        return '';
+      })()`
+    );
+    if (!branchedSummary.includes('tag picker')) {
+      throw new Error(`Expected branched summary to reflect revision 1 content, got: ${JSON.stringify(branchedSummary)}`);
+    }
+
     const rollbackClicked = await ctx.evaluate(
       `(() => {
         const button = document.querySelector('[data-revision-rollback="1"]');
@@ -428,6 +536,27 @@ export default {
         return revision === 1;
       },
       'LLM window did not rollback to revision 1'
+    );
+
+    await ctx.waitFor(
+      async () => {
+        const summary = await ctx.evaluate(
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+            if (!(frame instanceof HTMLElement)) return '';
+            const paragraphs = Array.from(frame.querySelectorAll('p'));
+            for (const paragraph of paragraphs) {
+              const text = paragraph.textContent?.trim() ?? '';
+              if (text.includes('Last instruction:')) {
+                return text;
+              }
+            }
+            return '';
+          })()`
+        );
+        return typeof summary === 'string' && summary.includes('tag picker');
+      },
+      'Rolled-back window summary did not appear'
     );
 
     const rolledBackSummary = await ctx.evaluate(

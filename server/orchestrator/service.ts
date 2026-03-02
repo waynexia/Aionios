@@ -84,7 +84,15 @@ function hydrateRedactedPreviousSource(prompt: string, previousSource: string | 
   const endMarker = 'Return only TSX module code.';
   const startIndex = prompt.indexOf(startMarker);
   if (startIndex === -1) {
-    return prompt;
+    const firstRenderMarker = 'No previous source exists yet (first render).';
+    const firstRenderIndex = prompt.indexOf(firstRenderMarker);
+    if (firstRenderIndex === -1) {
+      return prompt;
+    }
+    const hydrated = `${startMarker}\n${previousSource}\n\n`;
+    return `${prompt.slice(0, firstRenderIndex)}${hydrated}${prompt.slice(
+      firstRenderIndex + firstRenderMarker.length
+    )}`.trimEnd();
   }
   const endIndex = prompt.indexOf(endMarker, startIndex);
   if (endIndex === -1) {
@@ -103,8 +111,21 @@ export class WindowOrchestrator {
   private readonly eventBus = new SessionEventBus();
   private moduleBridge?: ModuleUpdateBridge;
   private readonly windowTaskQueue = new Map<string, Promise<void>>();
+  private readonly windowRollbackBarrier = new Map<string, number>();
 
   constructor(private readonly readConfig: () => PreferenceConfig) {}
+
+  private getRollbackBarrier(sessionId: string, windowId: string) {
+    const key = buildWindowKey(sessionId, windowId);
+    return this.windowRollbackBarrier.get(key) ?? 0;
+  }
+
+  private bumpRollbackBarrier(sessionId: string, windowId: string) {
+    const key = buildWindowKey(sessionId, windowId);
+    const next = (this.windowRollbackBarrier.get(key) ?? 0) + 1;
+    this.windowRollbackBarrier.set(key, next);
+    return next;
+  }
 
   createSession() {
     const sessionId = nanoid(16);
@@ -249,12 +270,14 @@ export class WindowOrchestrator {
       status: 'loading'
     });
 
+    const rollbackBarrier = this.getRollbackBarrier(input.sessionId, input.windowId);
     void this.enqueueWindowTask(input.sessionId, input.windowId, async () => {
       await this.generateRevision({
         sessionId: input.sessionId,
         windowId: input.windowId,
         reason: 'initial',
-        instruction: input.instruction
+        instruction: input.instruction,
+        rollbackBarrier
       });
     });
 
@@ -289,12 +312,14 @@ export class WindowOrchestrator {
       status: 'loading'
     });
 
+    const rollbackBarrier = this.getRollbackBarrier(input.sessionId, input.windowId);
     void this.enqueueWindowTask(input.sessionId, input.windowId, async () => {
       await this.generateRevision({
         sessionId: input.sessionId,
         windowId: input.windowId,
         reason: 'action',
-        instruction: input.instruction
+        instruction: input.instruction,
+        rollbackBarrier
       });
     });
 
@@ -334,25 +359,88 @@ export class WindowOrchestrator {
       status: 'loading'
     });
 
+    const rollbackBarrier = this.getRollbackBarrier(input.sessionId, input.windowId);
     void this.enqueueWindowTask(input.sessionId, input.windowId, async () => {
       await this.generateRevision({
         sessionId: input.sessionId,
         windowId: input.windowId,
         reason: 'action',
         instruction,
-        promptOverride: normalizedPrompt
+        promptOverride: normalizedPrompt,
+        rollbackBarrier
       });
     });
 
     return this.getWindowSnapshot(input.sessionId, input.windowId);
   }
 
+  regenerateWindowRevision(sessionId: string, windowId: string, targetRevision: number): WindowSnapshot {
+    const revision = this.getWindowRevision(sessionId, windowId, targetRevision);
+    const prompt = redactPreviousSource(revision.prompt);
+    return this.requestPromptUpdate({ sessionId, windowId, prompt });
+  }
+
+  branchWindowRevision(input: {
+    sessionId: string;
+    sourceWindowId: string;
+    sourceRevision: number;
+    newWindowId: string;
+    title?: string;
+  }): WindowSnapshot {
+    const sourceRecord = this.store.getWindow(input.sessionId, input.sourceWindowId);
+    if (!sourceRecord) {
+      throw new Error(`Window ${input.sessionId}/${input.sourceWindowId} not found`);
+    }
+    if (isSystemApp(sourceRecord.appId)) {
+      throw new Error('Cannot branch system app windows.');
+    }
+    if (this.store.getWindow(input.sessionId, input.newWindowId)) {
+      throw new Error(`Window ${input.sessionId}/${input.newWindowId} already exists`);
+    }
+
+    const sourceRevision = this.getWindowRevision(
+      input.sessionId,
+      input.sourceWindowId,
+      input.sourceRevision
+    );
+    const title = input.title ?? `${sourceRecord.title} (branch r${input.sourceRevision})`;
+
+    this.store.createWindow({
+      sessionId: input.sessionId,
+      windowId: input.newWindowId,
+      appId: sourceRecord.appId,
+      title
+    });
+
+    this.store.addContextEntry(
+      input.sessionId,
+      input.newWindowId,
+      createContextEntry(
+        'system',
+        `Branched from window "${input.sourceWindowId}" revision ${input.sourceRevision}.`
+      )
+    );
+
+    this.store.addRevision(
+      input.sessionId,
+      input.newWindowId,
+      sourceRevision.source,
+      sourceRevision.prompt,
+      sourceRevision.backend,
+      'remount'
+    );
+
+    return this.getWindowSnapshot(input.sessionId, input.newWindowId);
+  }
+
   closeWindow(sessionId: string, windowId: string) {
+    this.windowRollbackBarrier.delete(buildWindowKey(sessionId, windowId));
     const deleted = this.store.deleteWindow(sessionId, windowId);
     return deleted;
   }
 
   async rollbackWindow(sessionId: string, windowId: string, targetRevision: number) {
+    this.bumpRollbackBarrier(sessionId, windowId);
     const revision = this.store.rollbackToRevision(sessionId, windowId, targetRevision);
     if (this.moduleBridge) {
       await this.moduleBridge.pushWindowUpdate(sessionId, windowId, 'remount');
@@ -444,14 +532,19 @@ export default function WindowApp() {
     windowId,
     reason,
     instruction,
-    promptOverride
+    promptOverride,
+    rollbackBarrier
   }: {
     sessionId: string;
     windowId: string;
     reason: 'initial' | 'action';
     instruction?: string;
     promptOverride?: string;
+    rollbackBarrier: number;
   }) {
+    if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+      return;
+    }
     const record = this.store.getWindow(sessionId, windowId);
     if (!record) {
       return;
@@ -477,12 +570,21 @@ export default function WindowApp() {
     const prompt = buildGenerationPrompt(request);
     try {
       const generated = await createLlmProvider(this.readConfig()).generate(request);
+      if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+        return;
+      }
       const validation = await validateGeneratedSource(generated.source);
+      if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+        return;
+      }
       if (!validation.valid) {
         throw new Error(validation.issues.join('; '));
       }
 
       const plannedStrategy = pickUpdateStrategy(previousSource, generated.source);
+      if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+        return;
+      }
       const revision = this.store.addRevision(
         sessionId,
         windowId,
@@ -500,6 +602,9 @@ export default function WindowApp() {
       const strategyResult = this.moduleBridge
         ? await this.moduleBridge.pushWindowUpdate(sessionId, windowId, plannedStrategy)
         : { strategy: plannedStrategy };
+      if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+        return;
+      }
 
       if (strategyResult.strategy === 'remount') {
         this.eventBus.publish({
@@ -522,6 +627,9 @@ export default function WindowApp() {
         status: 'ready'
       });
     } catch (error) {
+      if (this.getRollbackBarrier(sessionId, windowId) !== rollbackBarrier) {
+        return;
+      }
       const message = (error as Error).message;
       if (!this.store.getWindow(sessionId, windowId)) {
         return;

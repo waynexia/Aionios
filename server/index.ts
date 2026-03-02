@@ -138,6 +138,61 @@ async function startServer() {
     }
   });
 
+  app.post(
+    '/api/sessions/:sessionId/windows/:windowId/revisions/:revision/branch',
+    (request, response) => {
+      const { sessionId, windowId } = request.params;
+      const parsedRevision = Number.parseInt(request.params.revision, 10);
+      const { newWindowId, title } = request.body as { newWindowId?: string; title?: string };
+      if (!Number.isFinite(parsedRevision) || parsedRevision <= 0) {
+        response.status(400).json({
+          message: 'revision must be a positive integer.'
+        });
+        return;
+      }
+      if (typeof newWindowId !== 'string' || newWindowId.trim().length === 0) {
+        response.status(400).json({
+          message: 'newWindowId is required.'
+        });
+        return;
+      }
+      const normalizedTitle = typeof title === 'string' && title.trim().length > 0 ? title.trim() : undefined;
+      try {
+        const snapshot = orchestrator.branchWindowRevision({
+          sessionId,
+          sourceWindowId: windowId,
+          sourceRevision: parsedRevision,
+          newWindowId,
+          title: normalizedTitle
+        });
+        response.status(201).json(snapshot);
+      } catch (error) {
+        response.status(404).json({
+          message: (error as Error).message
+        });
+      }
+    }
+  );
+
+  app.post('/api/sessions/:sessionId/windows/:windowId/revisions/:revision/regenerate', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    const parsedRevision = Number.parseInt(request.params.revision, 10);
+    if (!Number.isFinite(parsedRevision) || parsedRevision <= 0) {
+      response.status(400).json({
+        message: 'revision must be a positive integer.'
+      });
+      return;
+    }
+    try {
+      const snapshot = orchestrator.regenerateWindowRevision(sessionId, windowId, parsedRevision);
+      response.status(202).json(snapshot);
+    } catch (error) {
+      response.status(404).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
   app.post('/api/sessions/:sessionId/windows/open', (request, response) => {
     const { sessionId } = request.params;
     const { windowId, appId, title, instruction } = request.body as {

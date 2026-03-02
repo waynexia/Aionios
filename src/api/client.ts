@@ -130,6 +130,36 @@ export async function getWindowRevisionPrompt(input: {
   );
 }
 
+export async function branchWindowRevision(input: {
+  sessionId: string;
+  windowId: string;
+  revision: number;
+  newWindowId: string;
+  title?: string;
+}) {
+  return requestJson<ServerWindowSnapshot>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/revisions/${String(input.revision)}/branch`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        newWindowId: input.newWindowId,
+        title: input.title
+      })
+    }
+  );
+}
+
+export async function regenerateWindowRevision(input: {
+  sessionId: string;
+  windowId: string;
+  revision: number;
+}) {
+  return requestJson<ServerWindowSnapshot>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/revisions/${String(input.revision)}/regenerate`,
+    { method: 'POST' }
+  );
+}
+
 export async function closeWindow(input: { sessionId: string; windowId: string }) {
   const response = await fetch(`/api/sessions/${input.sessionId}/windows/${input.windowId}`, {
     method: 'DELETE'
