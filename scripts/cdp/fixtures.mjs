@@ -1,6 +1,6 @@
 export const PREFERENCE_EXPECTED = {
   llmBackend: 'codex',
-  codexCommand: 'codex exec --model gpt-5 --output-last-message',
+  codexCommand: 'codex exec --model gpt-5',
   codexTimeoutMs: 54_321,
   terminalShell: '/bin/sh'
 };
@@ -12,4 +12,3 @@ export const MEDIA_SOURCE_DATA_URL =
   'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=';
 
 export const EDITOR_MARKER = 'CDP_EDITOR_MARKER_20260301';
-

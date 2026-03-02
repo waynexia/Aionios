@@ -46,7 +46,7 @@ Then open `http://localhost:5173`.
 - Codex backend can still be bootstrapped via env defaults:
 
 ```bash
-AIONIOS_LLM_BACKEND=codex AIONIOS_CODEX_COMMAND="codex exec --skip-git-repo-check --output-last-message" npm run dev
+AIONIOS_LLM_BACKEND=codex AIONIOS_CODEX_COMMAND="codex exec --skip-git-repo-check" npm run dev
 ```
 
 ## Quality checks

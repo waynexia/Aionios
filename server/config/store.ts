@@ -9,7 +9,7 @@ import {
   type PreferenceConfigPatch
 } from './types';
 
-const DEFAULT_CODEX_COMMAND = 'codex exec --skip-git-repo-check --output-last-message';
+const DEFAULT_CODEX_COMMAND = 'codex exec --skip-git-repo-check';
 const DEFAULT_CODEX_TIMEOUT_MS = 120_000;
 const DEFAULT_CONFIG_RELATIVE_PATH = '.aionios/preferences.toml';
 

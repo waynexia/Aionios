@@ -30,7 +30,7 @@ afterEach(async () => {
 describe('PreferenceConfigStore', () => {
   const defaults: PreferenceConfig = {
     llmBackend: 'mock',
-    codexCommand: 'codex exec --skip-git-repo-check --output-last-message',
+    codexCommand: 'codex exec --skip-git-repo-check',
     codexTimeoutMs: 120_000,
     terminalShell: '/bin/sh'
   };

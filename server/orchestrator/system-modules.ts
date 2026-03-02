@@ -58,7 +58,7 @@ function toConfig(form: PreferenceFormState): PreferenceConfig {
 
 const INITIAL_FORM_STATE: PreferenceFormState = {
   llmBackend: 'mock',
-  codexCommand: 'codex exec --skip-git-repo-check --output-last-message',
+  codexCommand: 'codex exec --skip-git-repo-check',
   codexTimeoutMs: '120000',
   terminalShell: '/bin/sh'
 };
