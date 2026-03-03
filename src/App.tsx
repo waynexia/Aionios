@@ -620,7 +620,9 @@ export default function App() {
   const windowCanvasRef = useRef<HTMLElement | null>(null);
   const [contextMenu, setContextMenu] = useState<
     | { kind: 'desktop'; x: number; y: number; directory: string }
-    | { kind: 'directory'; x: number; y: number; directory: string }
+    | { kind: 'directory'; x: number; y: number; directory: string; windowId: string }
+    | { kind: 'recycle-bin'; x: number; y: number; windowId: string }
+    | { kind: 'recycle-bin-item'; x: number; y: number; windowId: string; itemId: string; originalPath: string }
     | { kind: 'icon'; x: number; y: number; appId: string }
     | { kind: 'file'; x: number; y: number; path: string }
     | null
@@ -1065,11 +1067,12 @@ export default function App() {
 
   const contextMenuItems = useMemo(
     () => {
-      if (!contextMenu || contextMenu.kind === 'desktop' || contextMenu.kind === 'directory') {
-        const directory =
-          contextMenu?.kind === 'desktop' || contextMenu?.kind === 'directory'
-            ? contextMenu.directory
-            : '/';
+      if (!contextMenu) {
+        return [];
+      }
+
+      if (contextMenu.kind === 'desktop') {
+        const directory = contextMenu.directory;
         return [
           {
             id: 'refresh',
@@ -1086,6 +1089,104 @@ export default function App() {
             }
           },
           { id: 'delete', label: 'Delete', disabled: true }
+        ];
+      }
+
+      if (contextMenu.kind === 'directory') {
+        const directory = contextMenu.directory;
+        return [
+          {
+            id: 'refresh',
+            label: 'Refresh',
+            onSelect: () => {
+              window.dispatchEvent(
+                new CustomEvent('aionios:fs-changed', { detail: { action: 'refresh', path: directory } })
+              );
+              void refreshPersistedApps();
+            }
+          },
+          {
+            id: 'new-file',
+            label: 'New File',
+            onSelect: () => {
+              window.dispatchEvent(
+                new CustomEvent('aionios:directory-new-file', {
+                  detail: { windowId: contextMenu.windowId, directory }
+                })
+              );
+            }
+          },
+          {
+            id: 'create',
+            label: 'Create New',
+            onSelect: () => {
+              setPromptDialog({ mode: 'create', directory });
+            }
+          },
+          { id: 'delete', label: 'Delete', disabled: true }
+        ];
+      }
+
+      if (contextMenu.kind === 'recycle-bin') {
+        return [
+          {
+            id: 'refresh',
+            label: 'Refresh',
+            onSelect: () => {
+              window.dispatchEvent(
+                new CustomEvent('aionios:recycle-bin-action', {
+                  detail: { windowId: contextMenu.windowId, action: 'refresh' }
+                })
+              );
+            }
+          },
+          {
+            id: 'empty',
+            label: 'Empty Recycle Bin',
+            onSelect: () => {
+              window.dispatchEvent(
+                new CustomEvent('aionios:recycle-bin-action', {
+                  detail: { windowId: contextMenu.windowId, action: 'empty' }
+                })
+              );
+            }
+          }
+        ];
+      }
+
+      if (contextMenu.kind === 'recycle-bin-item') {
+        return [
+          {
+            id: 'restore',
+            label: 'Restore',
+            onSelect: () => {
+              window.dispatchEvent(
+                new CustomEvent('aionios:recycle-bin-action', {
+                  detail: {
+                    windowId: contextMenu.windowId,
+                    action: 'restore',
+                    itemId: contextMenu.itemId
+                  }
+                })
+              );
+            }
+          },
+          {
+            id: 'delete-permanently',
+            label: 'Delete Permanently',
+            onSelect: () => {
+              window.dispatchEvent(
+                new CustomEvent('aionios:recycle-bin-action', {
+                  detail: {
+                    windowId: contextMenu.windowId,
+                    action: 'delete',
+                    itemId: contextMenu.itemId,
+                    originalPath: contextMenu.originalPath
+                  }
+                })
+              );
+            }
+          }
         ];
       }
 
@@ -1200,17 +1301,64 @@ export default function App() {
           return;
         }
 
+        const recycleBinItem = target?.closest<HTMLElement>('[data-recycle-bin-item-id]');
+        if (recycleBinItem) {
+          const itemId = recycleBinItem.getAttribute('data-recycle-bin-item-id') ?? '';
+          const originalPath = recycleBinItem.getAttribute('data-recycle-bin-original-path') ?? '';
+          const recycleBinFrame = recycleBinItem.closest<HTMLElement>(
+            '.window-frame[data-app-id="recycle-bin"][data-window-id]'
+          );
+          const windowId = recycleBinFrame?.getAttribute('data-window-id') ?? '';
+          if (itemId.trim().length > 0 && windowId.trim().length > 0) {
+            setContextMenu({
+              kind: 'recycle-bin-item',
+              x: event.clientX,
+              y: event.clientY,
+              windowId: windowId.trim(),
+              itemId: itemId.trim(),
+              originalPath
+            });
+            return;
+          }
+        }
+
         const directoryGroup = target?.closest<HTMLElement>('[data-directory-group]');
         const groupDirectory = directoryGroup?.getAttribute('data-directory-group') ?? '';
         if (groupDirectory.trim().length > 0) {
           const directory = groupDirectory.trim();
-          setContextMenu({
-            kind: directory === '/' ? 'desktop' : 'directory',
-            x: event.clientX,
-            y: event.clientY,
-            directory
-          });
+          const directoryFrame = directoryGroup?.closest<HTMLElement>(
+            '.window-frame[data-app-id="directory"][data-window-id]'
+          );
+          const windowId = directoryFrame?.getAttribute('data-window-id') ?? '';
+          if (windowId.trim().length > 0) {
+            setContextMenu({
+              kind: 'directory',
+              x: event.clientX,
+              y: event.clientY,
+              directory,
+              windowId: windowId.trim()
+            });
+          } else {
+            setContextMenu({ kind: 'desktop', x: event.clientX, y: event.clientY, directory: '/' });
+          }
           return;
+        }
+
+        const recycleBinSurface = target?.closest<HTMLElement>('[data-recycle-bin-list]');
+        if (recycleBinSurface) {
+          const recycleBinFrame = recycleBinSurface.closest<HTMLElement>(
+            '.window-frame[data-app-id="recycle-bin"][data-window-id]'
+          );
+          const windowId = recycleBinFrame?.getAttribute('data-window-id') ?? '';
+          if (windowId.trim().length > 0) {
+            setContextMenu({
+              kind: 'recycle-bin',
+              x: event.clientX,
+              y: event.clientY,
+              windowId: windowId.trim()
+            });
+            return;
+          }
         }
 
         setContextMenu({ kind: 'desktop', x: event.clientX, y: event.clientY, directory: '/' });

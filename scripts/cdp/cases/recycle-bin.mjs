@@ -1,5 +1,5 @@
 import { RECYCLE_BIN_DRAFT_CONTENT, RECYCLE_BIN_DRAFT_PATH } from '../fixtures.mjs';
-import { click, openDesktopApp } from '../actions.mjs';
+import { openDesktopApp } from '../actions.mjs';
 
 export default {
   id: 'recycle-bin',
@@ -151,40 +151,57 @@ export default {
             `(() => {
               const frame = document.querySelector('.window-frame[data-app-id="recycle-bin"][data-window-id="${recycleWindowId}"]');
               if (!(frame instanceof HTMLElement)) return false;
-              const items = Array.from(frame.querySelectorAll('[data-recycle-bin-item]'));
-              return items.some((item) => {
-                if (!(item instanceof HTMLElement)) return false;
-                const label = item.querySelector('strong')?.textContent?.trim() ?? '';
-                return label === ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)};
-              });
+              const entry = frame.querySelector('[data-recycle-bin-original-path="' + ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)} + '"]');
+              return entry instanceof HTMLElement;
             })()`
           )
         ),
       'Recycle bin did not list the deleted file'
     );
 
-    const restoreAnchor = await ctx.evaluate(
+    const recycleBinContextMenuDispatched = await ctx.evaluate(
       `(() => {
         const frame = document.querySelector('.window-frame[data-app-id="recycle-bin"][data-window-id="${recycleWindowId}"]');
-        if (!(frame instanceof HTMLElement)) return null;
-        const items = Array.from(frame.querySelectorAll('[data-recycle-bin-item]'));
-        for (const item of items) {
-          if (!(item instanceof HTMLElement)) continue;
-          const label = item.querySelector('strong')?.textContent?.trim() ?? '';
-          if (label !== ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)}) continue;
-          const button = item.querySelector('button[data-recycle-bin-restore]');
-          if (!(button instanceof HTMLElement)) return null;
-          button.scrollIntoView({ block: 'center', inline: 'center' });
-          const rect = button.getBoundingClientRect();
-          return { x: Math.round(rect.left + rect.width / 2), y: Math.round(rect.top + rect.height / 2) };
-        }
-        return null;
+        if (!(frame instanceof HTMLElement)) return false;
+        const entry = frame.querySelector('[data-recycle-bin-original-path="' + ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)} + '"]');
+        if (!(entry instanceof HTMLElement)) return false;
+        entry.scrollIntoView({ block: 'center', inline: 'center' });
+        const rect = entry.getBoundingClientRect();
+        const x = Math.round(rect.left + rect.width / 2);
+        const y = Math.round(rect.top + rect.height / 2);
+        const event = new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          button: 2,
+          buttons: 2
+        });
+        entry.dispatchEvent(event);
+        return true;
       })()`
     );
-    if (!restoreAnchor) {
-      throw new Error('Unable to locate Restore button for recycle bin item');
+    if (!recycleBinContextMenuDispatched) {
+      throw new Error('Unable to open context menu for recycle bin item');
     }
-    await click(ctx, restoreAnchor);
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(await ctx.evaluate("document.querySelector('[data-context-menu]') instanceof HTMLElement")),
+      'Recycle bin context menu did not open'
+    );
+
+    const restoreSelected = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-context-menu-item="restore"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!restoreSelected) {
+      throw new Error('Unable to select Restore from recycle bin context menu');
+    }
 
     await ctx.waitFor(
       async () =>

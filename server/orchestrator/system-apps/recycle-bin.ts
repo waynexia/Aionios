@@ -17,6 +17,7 @@ type RecycleBinBridge = {
 
 type WindowProps = {
   host: {
+    windowId: string;
     recycleBin: RecycleBinBridge;
   };
   windowState: {
@@ -51,14 +52,52 @@ function formatDate(value: string) {
   }
 }
 
+function fileNameFromPath(path: string) {
+  const normalized = path.replaceAll('\\\\', '/').trim();
+  const splitIndex = normalized.lastIndexOf('/');
+  return splitIndex === -1 ? normalized : normalized.slice(splitIndex + 1);
+}
+
+function resolveFileIcon(path: string) {
+  const name = fileNameFromPath(path).toLowerCase();
+  if (!name) {
+    return '📄';
+  }
+  if (name.endsWith('.aionios-app.json')) {
+    return '🧩';
+  }
+  if (name.endsWith('.md')) {
+    return '📝';
+  }
+  if (name.endsWith('.toml')) {
+    return '⚙️';
+  }
+  if (name.endsWith('.ts') || name.endsWith('.tsx') || name.endsWith('.js') || name.endsWith('.jsx')) {
+    return '💻';
+  }
+  if (name.endsWith('.json')) {
+    return '🧾';
+  }
+  if (name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.gif')) {
+    return '🖼️';
+  }
+  if (name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.webm')) {
+    return '🎬';
+  }
+  if (name.endsWith('.mp3') || name.endsWith('.wav')) {
+    return '🎵';
+  }
+  return '📄';
+}
+
 export default function WindowApp({ host, windowState }: WindowProps) {
   const [items, setItems] = useState<RecycleBinItem[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [emptying, setEmptying] = useState(false);
   const [confirmEmpty, setConfirmEmpty] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [status, setStatus] = useState('Loading recycle bin...');
   const [error, setError] = useState<string | null>(null);
 
@@ -70,9 +109,16 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       const nextItems = await host.recycleBin.listItems();
       nextItems.sort((left, right) => right.deletedAt.localeCompare(left.deletedAt, 'en-US'));
       setItems(nextItems);
+      setSelectedItemId((current) => {
+        if (current && nextItems.some((item) => item.id === current)) {
+          return current;
+        }
+        return nextItems[0]?.id ?? null;
+      });
       setStatus(nextItems.length === 0 ? 'Recycle bin is empty.' : 'Loaded ' + nextItems.length + ' item(s).');
     } catch (reason) {
       setItems([]);
+      setSelectedItemId(null);
       setError((reason as Error).message);
       setStatus('Failed to load recycle bin.');
     } finally {
@@ -94,6 +140,48 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     };
   }, [reload]);
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail =
+        event instanceof CustomEvent
+          ? (event.detail as
+              | {
+                  windowId?: unknown;
+                  action?: unknown;
+                  itemId?: unknown;
+                  originalPath?: unknown;
+                }
+              | undefined)
+          : undefined;
+      if (!detail || detail.windowId !== host.windowId) {
+        return;
+      }
+      if (detail.action === 'refresh') {
+        void reload();
+        return;
+      }
+      if (detail.action === 'empty') {
+        void emptyBinImmediate();
+        return;
+      }
+      if (detail.action === 'restore' && typeof detail.itemId === 'string') {
+        void restoreItem(detail.itemId);
+        return;
+      }
+      if (
+        detail.action === 'delete' &&
+        typeof detail.itemId === 'string' &&
+        typeof detail.originalPath === 'string'
+      ) {
+        void deleteItem(detail.itemId, detail.originalPath);
+      }
+    };
+    window.addEventListener('aionios:recycle-bin-action', handler);
+    return () => {
+      window.removeEventListener('aionios:recycle-bin-action', handler);
+    };
+  }, [deleteItem, emptyBinImmediate, host.windowId, reload, restoreItem]);
+
   const filteredItems = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) {
@@ -107,7 +195,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       return;
     }
     setBusyItemId(id);
-    setConfirmDeleteId(null);
     setConfirmEmpty(false);
     setError(null);
     setStatus('Restoring item...');
@@ -123,17 +210,14 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     }
   }
 
-  async function deleteItem(id: string) {
+  async function deleteItem(id: string, originalPath: string) {
     if (busyItemId || emptying) {
       return;
     }
-    if (confirmDeleteId !== id) {
-      setConfirmDeleteId(id);
-      setConfirmEmpty(false);
+    if (!window.confirm('Permanently delete "' + originalPath + '" from the recycle bin?')) {
       return;
     }
     setBusyItemId(id);
-    setConfirmDeleteId(null);
     setConfirmEmpty(false);
     setError(null);
     setStatus('Deleting item permanently...');
@@ -155,12 +239,33 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     }
     if (!confirmEmpty) {
       setConfirmEmpty(true);
-      setConfirmDeleteId(null);
       return;
     }
     setEmptying(true);
     setConfirmEmpty(false);
-    setConfirmDeleteId(null);
+    setError(null);
+    setStatus('Emptying recycle bin...');
+    try {
+      const result = await host.recycleBin.empty();
+      await reload();
+      setStatus('Emptied ' + result.emptied + ' item(s).');
+    } catch (reason) {
+      setError((reason as Error).message);
+      setStatus('Empty failed.');
+    } finally {
+      setEmptying(false);
+    }
+  }
+
+  async function emptyBinImmediate() {
+    if (busyItemId || emptying || items.length === 0) {
+      return;
+    }
+    if (!window.confirm('Empty the recycle bin permanently?')) {
+      return;
+    }
+    setEmptying(true);
+    setConfirmEmpty(false);
     setError(null);
     setStatus('Emptying recycle bin...');
     try {
@@ -242,67 +347,25 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             {items.length === 0 ? 'Recycle bin is empty.' : 'No matches.'}
           </p>
         ) : (
-          <div style={{ display: 'grid', gap: 8 }}>
+          <div className="icon-grid">
             {filteredItems.map((item) => (
-              <article
+              <button
                 key={item.id}
                 data-recycle-bin-item={item.id}
-                style={{
-                  borderRadius: 10,
-                  border: '1px solid rgba(148,163,184,0.25)',
-                  background: 'rgba(15,23,42,0.35)',
-                  padding: 10,
-                  display: 'grid',
-                  gap: 6
+                data-recycle-bin-item-id={item.id}
+                data-recycle-bin-original-path={item.originalPath}
+                type="button"
+                className={\`icon-tile\${selectedItemId === item.id ? ' icon-tile--selected' : ''}\`}
+                onClick={() => setSelectedItemId(item.id)}
+                onDoubleClick={() => {
+                  void restoreItem(item.id);
                 }}
+                onContextMenu={() => setSelectedItemId(item.id)}
+                title={item.originalPath + ' — ' + formatBytes(item.sizeBytes) + ' — Deleted: ' + formatDate(item.deletedAt)}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-                  <strong style={{ fontSize: 12, color: '#e2e8f0' }}>{item.originalPath}</strong>
-                  <span style={{ fontSize: 11, color: '#94a3b8' }}>{formatBytes(item.sizeBytes)}</span>
-                </div>
-                <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                  Deleted: {formatDate(item.deletedAt)}
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    type="button"
-                    data-recycle-bin-restore={item.id}
-                    disabled={Boolean(busyItemId) || emptying}
-                    onClick={() => {
-                      void restoreItem(item.id);
-                    }}
-                    style={{
-                      borderRadius: 8,
-                      border: 0,
-                      padding: '6px 10px',
-                      background: '#2563eb',
-                      color: '#f8fafc',
-                      cursor: busyItemId || emptying ? 'default' : 'pointer'
-                    }}
-                  >
-                    {busyItemId === item.id ? 'Working...' : 'Restore'}
-                  </button>
-                  <button
-                    type="button"
-                    data-recycle-bin-delete={item.id}
-                    disabled={Boolean(busyItemId) || emptying}
-                    onClick={() => {
-                      void deleteItem(item.id);
-                    }}
-                    style={{
-                      borderRadius: 8,
-                      border: '1px solid rgba(248,113,113,0.6)',
-                      padding: '6px 10px',
-                      background: confirmDeleteId === item.id ? '#dc2626' : 'rgba(127,29,29,0.35)',
-                      color: '#fecaca',
-                      cursor: busyItemId || emptying ? 'default' : 'pointer'
-                    }}
-                    title={confirmDeleteId === item.id ? 'Click again to confirm permanent delete' : 'Delete permanently'}
-                  >
-                    {confirmDeleteId === item.id ? 'Confirm Delete' : 'Delete'}
-                  </button>
-                </div>
-              </article>
+                <span className="icon-tile__emoji">{resolveFileIcon(item.originalPath)}</span>
+                <span className="icon-tile__label">{fileNameFromPath(item.originalPath)}</span>
+              </button>
             ))}
           </div>
         )}
@@ -318,4 +381,3 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   );
 }
 `.trim();
-
