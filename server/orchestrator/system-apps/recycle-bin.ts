@@ -1,5 +1,5 @@
 export const RECYCLE_BIN_WINDOW_SOURCE = `
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type RecycleBinItem = {
   id: string;
@@ -92,12 +92,10 @@ function resolveFileIcon(path: string) {
 
 export default function WindowApp({ host, windowState }: WindowProps) {
   const [items, setItems] = useState<RecycleBinItem[]>([]);
-  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [emptying, setEmptying] = useState(false);
-  const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [status, setStatus] = useState('Loading recycle bin...');
   const [error, setError] = useState<string | null>(null);
 
@@ -113,7 +111,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         if (current && nextItems.some((item) => item.id === current)) {
           return current;
         }
-        return nextItems[0]?.id ?? null;
+        return null;
       });
       setStatus(nextItems.length === 0 ? 'Recycle bin is empty.' : 'Loaded ' + nextItems.length + ' item(s).');
     } catch (reason) {
@@ -182,20 +180,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     };
   }, [deleteItem, emptyBinImmediate, host.windowId, reload, restoreItem]);
 
-  const filteredItems = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed) {
-      return items;
-    }
-    return items.filter((item) => item.originalPath.toLowerCase().includes(trimmed));
-  }, [items, query]);
-
   async function restoreItem(id: string) {
     if (busyItemId || emptying) {
       return;
     }
     setBusyItemId(id);
-    setConfirmEmpty(false);
     setError(null);
     setStatus('Restoring item...');
     try {
@@ -218,7 +207,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       return;
     }
     setBusyItemId(id);
-    setConfirmEmpty(false);
     setError(null);
     setStatus('Deleting item permanently...');
     try {
@@ -233,30 +221,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     }
   }
 
-  async function emptyBin() {
-    if (busyItemId || emptying || items.length === 0) {
-      return;
-    }
-    if (!confirmEmpty) {
-      setConfirmEmpty(true);
-      return;
-    }
-    setEmptying(true);
-    setConfirmEmpty(false);
-    setError(null);
-    setStatus('Emptying recycle bin...');
-    try {
-      const result = await host.recycleBin.empty();
-      await reload();
-      setStatus('Emptied ' + result.emptied + ' item(s).');
-    } catch (reason) {
-      setError((reason as Error).message);
-      setStatus('Empty failed.');
-    } finally {
-      setEmptying(false);
-    }
-  }
-
   async function emptyBinImmediate() {
     if (busyItemId || emptying || items.length === 0) {
       return;
@@ -265,7 +229,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       return;
     }
     setEmptying(true);
-    setConfirmEmpty(false);
     setError(null);
     setStatus('Emptying recycle bin...');
     try {
@@ -281,74 +244,40 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   }
 
   return (
-    <div data-recycle-bin-app style={{ display: 'grid', gridTemplateRows: 'auto auto 1fr auto', gap: 12, height: '100%' }}>
-      <header style={{ display: 'grid', gap: 4 }}>
-        <strong>{windowState.title}</strong>
-        <p style={{ margin: 0, fontSize: 12, opacity: 0.85 }}>
-          Restore deleted files or permanently remove them.
-        </p>
-      </header>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <label style={{ display: 'grid', gap: 4, fontSize: 12, flex: 1 }}>
-          <span style={{ color: '#bfdbfe' }}>Filter</span>
-          <input
-            data-recycle-bin-filter
-            value={query}
-            disabled={loading || emptying}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search by original path"
-            style={{
-              borderRadius: 8,
-              border: '1px solid rgba(148,163,184,0.4)',
-              background: 'rgba(15,23,42,0.85)',
-              color: '#e2e8f0',
-              padding: '8px 10px'
-            }}
-          />
-        </label>
-        <button
-          data-recycle-bin-empty
-          type="button"
-          disabled={loading || emptying || items.length === 0}
-          onClick={() => {
-            void emptyBin();
-          }}
-          style={{
-            alignSelf: 'end',
-            borderRadius: 8,
-            border: 0,
-            padding: '8px 12px',
-            background: confirmEmpty ? '#dc2626' : items.length === 0 ? '#1e293b' : '#334155',
-            color: '#f8fafc',
-            cursor: loading || emptying || items.length === 0 ? 'default' : 'pointer'
-          }}
-          title={items.length === 0 ? 'Recycle bin is already empty' : confirmEmpty ? 'Click again to confirm' : 'Empty recycle bin'}
-        >
-          {emptying ? 'Emptying...' : confirmEmpty ? 'Confirm Empty' : 'Empty'}
-        </button>
-      </div>
-
+    <div
+      data-recycle-bin-app
+      style={{
+        display: 'grid',
+        gridTemplateRows: '1fr auto',
+        gap: 10,
+        height: '100%',
+        minHeight: 0,
+        padding: 10
+      }}
+    >
       <section
         data-recycle-bin-list
         style={{
-          borderRadius: 12,
-          border: '1px solid rgba(148,163,184,0.35)',
-          background: 'rgba(2,6,23,0.4)',
-          padding: 10,
           overflow: 'auto',
           minHeight: 0
+        }}
+        onPointerDown={(event) => {
+          const target = event.target instanceof Element ? event.target : null;
+          if (target?.closest('[data-recycle-bin-item-id]')) {
+            return;
+          }
+          setSelectedItemId(null);
         }}
       >
         {loading ? (
           <p style={{ margin: 0, fontSize: 12, color: '#bfdbfe' }}>Loading...</p>
-        ) : filteredItems.length === 0 ? (
+        ) : items.length === 0 ? (
           <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>
-            {items.length === 0 ? 'Recycle bin is empty.' : 'No matches.'}
+            Recycle bin is empty.
           </p>
         ) : (
           <div className="icon-grid">
-            {filteredItems.map((item) => (
+            {items.map((item) => (
               <button
                 key={item.id}
                 data-recycle-bin-item={item.id}

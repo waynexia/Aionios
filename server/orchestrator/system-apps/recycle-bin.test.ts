@@ -13,8 +13,6 @@ describe('recycle bin system app source', () => {
   it('includes stable testing hooks', () => {
     expect(RECYCLE_BIN_WINDOW_SOURCE).toContain('data-recycle-bin-app');
     expect(RECYCLE_BIN_WINDOW_SOURCE).toContain('data-recycle-bin-list');
-    expect(RECYCLE_BIN_WINDOW_SOURCE).toContain('data-recycle-bin-empty');
     expect(RECYCLE_BIN_WINDOW_SOURCE).toContain('data-recycle-bin-status');
   });
 });
-

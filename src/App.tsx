@@ -1344,9 +1344,27 @@ export default function App() {
           return;
         }
 
-        const recycleBinSurface = target?.closest<HTMLElement>('[data-recycle-bin-list]');
-        if (recycleBinSurface) {
-          const recycleBinFrame = recycleBinSurface.closest<HTMLElement>(
+        const directoryApp = target?.closest<HTMLElement>('[data-directory-app]');
+        if (directoryApp) {
+          const directoryFrame = directoryApp.closest<HTMLElement>(
+            '.window-frame[data-app-id="directory"][data-window-id]'
+          );
+          const windowId = directoryFrame?.getAttribute('data-window-id') ?? '';
+          if (windowId.trim().length > 0) {
+            setContextMenu({
+              kind: 'directory',
+              x: event.clientX,
+              y: event.clientY,
+              directory: '/',
+              windowId: windowId.trim()
+            });
+            return;
+          }
+        }
+
+        const recycleBinApp = target?.closest<HTMLElement>('[data-recycle-bin-app]');
+        if (recycleBinApp) {
+          const recycleBinFrame = recycleBinApp.closest<HTMLElement>(
             '.window-frame[data-app-id="recycle-bin"][data-window-id]'
           );
           const windowId = recycleBinFrame?.getAttribute('data-window-id') ?? '';

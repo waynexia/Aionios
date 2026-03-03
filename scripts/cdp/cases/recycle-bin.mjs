@@ -137,7 +137,7 @@ export default {
               if (!(frame instanceof HTMLElement)) return false;
               return frame.querySelector('[data-recycle-bin-app]') instanceof HTMLElement &&
                 frame.querySelector('[data-recycle-bin-list]') instanceof HTMLElement &&
-                frame.querySelector('[data-recycle-bin-empty]') instanceof HTMLButtonElement;
+                frame.querySelector('[data-recycle-bin-status]') instanceof HTMLElement;
             })()`
           )
         ),

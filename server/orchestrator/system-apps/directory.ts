@@ -165,8 +165,9 @@ function parseAppDescriptor(content: string): { appId: string; title: string; ic
 export default function WindowApp({ host, windowState }: WindowProps) {
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [draftPath, setDraftPath] = useState('notes/new-file.txt');
+  const [draftPath, setDraftPath] = useState('');
   const [draftContent, setDraftContent] = useState('');
+  const [savedContent, setSavedContent] = useState('');
   const [loadingList, setLoadingList] = useState(true);
   const [loadingFile, setLoadingFile] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -193,9 +194,13 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           if (current && nextPaths.includes(current)) {
             return current;
           }
-          return nextPaths[0] ?? null;
+          return null;
         });
-        setStatusMessage(nextPaths.length === 0 ? 'No files found. Create one below.' : 'Loaded ' + nextPaths.length + ' file(s).');
+        setStatusMessage(
+          nextPaths.length === 0
+            ? 'No files found. Right-click a directory to create a file.'
+            : 'Loaded ' + nextPaths.length + ' file(s).'
+        );
       } catch (reason) {
         if (!canCommit()) {
           return;
@@ -244,6 +249,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         }
         setDraftPath(selectedPath);
         setDraftContent(content);
+        setSavedContent(content);
         setStatusMessage('Loaded ' + selectedPath + '.');
         setLoadingFile(false);
       })
@@ -253,6 +259,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         }
         setError((reason as Error).message);
         setStatusMessage('Failed to load selected file.');
+        setSavedContent('');
         setLoadingFile(false);
       });
     return () => {
@@ -262,23 +269,35 @@ export default function WindowApp({ host, windowState }: WindowProps) {
 
   const groups = useMemo(() => toDirectoryGroups(files), [files]);
   const selectedLabel = selectedPath ?? '(new file)';
-  const selectedDescriptor = useMemo(() => {
-    if (!selectedPath || !selectedPath.endsWith('.aionios-app.json')) {
-      return null;
-    }
-    return parseAppDescriptor(draftContent);
-  }, [draftContent, selectedPath]);
   const canSave = !saving && !loadingList && draftPath.trim().length > 0;
+  const hasUnsavedChanges = useMemo(() => draftContent !== savedContent, [draftContent, savedContent]);
 
   const createNewFileDraft = useCallback((directory?: string) => {
+    if (hasUnsavedChanges && !window.confirm('Discard unsaved changes?')) {
+      return;
+    }
     const normalizedDir = typeof directory === 'string' ? normalizePath(directory) : '';
     const prefix = normalizedDir.length > 0 ? normalizedDir.replace(/\\/+$/g, '') + '/' : '';
     setSelectedPath(null);
     setError(null);
     setDraftPath(prefix + 'new-file.txt');
     setDraftContent('');
+    setSavedContent('');
     setStatusMessage('Creating a new file draft.');
-  }, []);
+  }, [hasUnsavedChanges]);
+
+  const selectPath = useCallback(
+    (path: string) => {
+      if (path === selectedPath) {
+        return;
+      }
+      if (hasUnsavedChanges && !window.confirm('Discard unsaved changes?')) {
+        return;
+      }
+      setSelectedPath(path);
+    },
+    [hasUnsavedChanges, selectedPath]
+  );
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -311,6 +330,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     setStatusMessage('Saving ' + normalizedPath + '...');
     try {
       await host.writeFile(normalizedPath, draftContent);
+      setSavedContent(draftContent);
       const listed = await host.listFiles();
       const nextFiles = toFiles(listed);
       const existing = nextFiles.some((entry) => entry.path === normalizedPath);
@@ -335,74 +355,52 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       data-directory-app
       style={{
         display: 'grid',
-        gridTemplateRows: 'auto auto 1fr auto',
+        gridTemplateRows: '1fr auto',
         gap: 10,
-        height: '100%'
+        height: '100%',
+        minHeight: 0,
+        padding: 10
+      }}
+      onPointerDown={(event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (target?.closest('button, input, textarea, select, option, [contenteditable]')) {
+          return;
+        }
+        if (target?.closest('[data-directory-entry-path]')) {
+          return;
+        }
+        setSelectedPath(null);
+      }}
+      onMouseDown={(event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (target?.closest('button, input, textarea, select, option, [contenteditable]')) {
+          return;
+        }
+        if (target?.closest('[data-directory-entry-path]')) {
+          return;
+        }
+        setSelectedPath(null);
       }}
     >
-      <header>
-        <strong>{windowState.title}</strong>
-        <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.8 }}>
-          Browse host files, preview text content, and save edits.
-        </p>
-      </header>
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span data-directory-selected style={{ fontSize: 12, color: '#bfdbfe' }}>
-          {selectedLabel}
-        </span>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {selectedDescriptor ? (
-            <button
-              type="button"
-              onClick={() => {
-                void host.openApp(selectedDescriptor.appId);
-              }}
-              style={{
-                borderRadius: 8,
-                border: '1px solid rgba(148,163,184,0.4)',
-                background: 'rgba(37,99,235,0.2)',
-                color: '#e2e8f0',
-                padding: '6px 10px',
-                cursor: 'pointer'
-              }}
-              title={selectedDescriptor.title ? 'Open ' + selectedDescriptor.title : 'Open app'}
-            >
-              Open App
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => createNewFileDraft()}
-            style={{
-              borderRadius: 8,
-              border: '1px solid rgba(148,163,184,0.4)',
-              background: 'transparent',
-              color: '#e2e8f0',
-              padding: '6px 10px',
-              cursor: 'pointer'
-            }}
-          >
-            New File
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(260px, 2fr)', gap: 10, minHeight: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.2fr) minmax(280px, 1fr)', gap: 12, minHeight: 0 }}>
         <section
           data-directory-list
           style={{
-            borderRadius: 10,
-            border: '1px solid rgba(148,163,184,0.35)',
-            background: 'rgba(2,6,23,0.4)',
             overflow: 'auto',
-            padding: 8
+            padding: 4
+          }}
+          onPointerDown={(event) => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target?.closest('[data-directory-entry-path]')) {
+              return;
+            }
+            setSelectedPath(null);
           }}
         >
           {loadingList ? (
             <p style={{ margin: 0, fontSize: 12, color: '#bfdbfe' }}>Loading files...</p>
           ) : files.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>No files yet.</p>
+            <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>No files yet. Right-click to create one.</p>
           ) : (
             groups.map((group) => (
               <div
@@ -427,15 +425,15 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                         data-directory-entry-path={file.path}
                         type="button"
                         className={\`icon-tile\${isSelected ? ' icon-tile--selected' : ''}\`}
-                        onClick={() => setSelectedPath(file.path)}
+                        onClick={() => selectPath(file.path)}
                         onDoubleClick={() => {
                           if (descriptor) {
                             void host.openApp(descriptor.appId);
                             return;
                           }
-                          setSelectedPath(file.path);
+                          selectPath(file.path);
                         }}
-                        onContextMenu={() => setSelectedPath(file.path)}
+                        onContextMenu={() => selectPath(file.path)}
                         title={file.path}
                       >
                         <span className="icon-tile__emoji">{emoji}</span>
@@ -451,13 +449,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
 
         <section
           style={{
-            borderRadius: 10,
-            border: '1px solid rgba(148,163,184,0.35)',
-            background: 'rgba(2,6,23,0.4)',
-            padding: 10,
             display: 'grid',
-            gap: 8,
-            minHeight: 0
+            gap: 10,
+            minHeight: 0,
+            paddingLeft: 12,
+            borderLeft: '1px solid rgba(148,163,184,0.22)'
           }}
         >
           <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
@@ -526,6 +522,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           {loadingFile ? 'Reading selected file...' : statusMessage}
         </p>
         {error ? <p style={{ margin: 0, fontSize: 12, color: '#fecaca' }}>{error}</p> : null}
+        <span data-directory-selected style={{ display: 'none' }}>{selectedLabel}</span>
       </footer>
     </div>
   );
