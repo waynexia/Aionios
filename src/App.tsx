@@ -486,6 +486,134 @@ function deriveWindowTitleFromInstruction(instruction: string) {
   return `${collapsed.slice(0, maxLength - 1)}…`;
 }
 
+interface WindowRuntimeWithHostBridgeProps {
+  activeSessionId: string;
+  windowItem: DesktopWindow;
+  terminalState?: TerminalStateSnapshot;
+  sessionRef: { current: string | undefined };
+  dispatch: (action: AppAction) => void;
+  openApp: (appId: string, instruction?: string) => Promise<void>;
+  requestUpdateForWindow: (windowId: string, instruction: string) => Promise<void>;
+  refreshPersistedApps: () => Promise<void>;
+}
+
+function WindowRuntimeWithHostBridge({
+  activeSessionId,
+  windowItem,
+  terminalState,
+  sessionRef,
+  dispatch,
+  openApp,
+  requestUpdateForWindow,
+  refreshPersistedApps
+}: WindowRuntimeWithHostBridgeProps) {
+  const hostBridge = useMemo<HostBridge>(
+    () => ({
+      sessionId: activeSessionId,
+      windowId: windowItem.windowId,
+      appId: windowItem.appId,
+      openApp: async (appId) => {
+        await openApp(appId);
+      },
+      readFile: async (path) => (await readHostFile({ path })).content,
+      writeFile: async (path, content) => {
+        await writeHostFile({ path, content });
+      },
+      requestUpdate: async (instruction) => {
+        await requestUpdateForWindow(windowItem.windowId, instruction);
+      },
+      listFiles: async () => (await listHostFiles()).files,
+      preference: {
+        read: async () => getPreferenceConfig(),
+        update: async (input) => updatePreferenceConfig(input)
+      },
+      terminal: {
+        start: async () => {
+          const currentSessionId = sessionRef.current;
+          if (!currentSessionId) {
+            return;
+          }
+          const metadata = await startTerminal({
+            sessionId: currentSessionId,
+            windowId: windowItem.windowId
+          });
+          dispatch({
+            type: 'window-server-event',
+            event: {
+              type: 'terminal-status',
+              sessionId: currentSessionId,
+              windowId: windowItem.windowId,
+              status: 'running',
+              shell: metadata.shell,
+              cwd: metadata.cwd
+            }
+          });
+        },
+        sendInput: async (input) => {
+          const currentSessionId = sessionRef.current;
+          if (!currentSessionId) {
+            return;
+          }
+          await sendTerminalInput({
+            sessionId: currentSessionId,
+            windowId: windowItem.windowId,
+            payload: input
+          });
+        },
+        stop: async () => {
+          const currentSessionId = sessionRef.current;
+          if (!currentSessionId) {
+            return;
+          }
+          await stopTerminal({
+            sessionId: currentSessionId,
+            windowId: windowItem.windowId
+          });
+        }
+      },
+      recycleBin: {
+        listItems: async () => (await listRecycleBinItems()).items,
+        trash: async (path) => {
+          const trashed = await trashHostFile({ path });
+          window.dispatchEvent(
+            new CustomEvent('aionios:fs-changed', { detail: { action: 'trash', path: trashed.originalPath } })
+          );
+          if (trashed.originalPath.endsWith('.aionios-app.json')) {
+            await refreshPersistedApps();
+          }
+          return trashed;
+        },
+        restore: async (id) => {
+          const restored = await restoreRecycleBinItem({ id });
+          window.dispatchEvent(
+            new CustomEvent('aionios:fs-changed', { detail: { action: 'restore', path: restored.restoredPath } })
+          );
+          if (restored.restoredPath.endsWith('.aionios-app.json')) {
+            await refreshPersistedApps();
+          }
+          return restored;
+        },
+        deleteItem: async (id) => {
+          await deleteRecycleBinItem({ id });
+        },
+        empty: async () => emptyRecycleBin()
+      }
+    }),
+    [
+      activeSessionId,
+      dispatch,
+      openApp,
+      refreshPersistedApps,
+      requestUpdateForWindow,
+      sessionRef,
+      windowItem.appId,
+      windowItem.windowId
+    ]
+  );
+
+  return <WindowRuntime windowItem={windowItem} hostBridge={hostBridge} terminalState={terminalState} />;
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const sessionRef = useRef(state.sessionId);
@@ -1098,98 +1226,6 @@ export default function App() {
               return null;
             }
 
-            const hostBridge: HostBridge = {
-              sessionId: activeSessionId,
-              windowId: windowItem.windowId,
-              appId: windowItem.appId,
-              openApp: async (appId) => {
-                await openApp(appId);
-              },
-              readFile: async (path) => (await readHostFile({ path })).content,
-              writeFile: async (path, content) => {
-                await writeHostFile({ path, content });
-              },
-              requestUpdate: async (instruction) => {
-                await requestUpdateForWindow(windowItem.windowId, instruction);
-              },
-              listFiles: async () => (await listHostFiles()).files,
-              preference: {
-                read: async () => getPreferenceConfig(),
-                update: async (input) => updatePreferenceConfig(input)
-              },
-              terminal: {
-                start: async () => {
-                  const currentSessionId = sessionRef.current;
-                  if (!currentSessionId) {
-                    return;
-                  }
-                  const metadata = await startTerminal({
-                    sessionId: currentSessionId,
-                    windowId: windowItem.windowId
-                  });
-                  dispatch({
-                    type: 'window-server-event',
-                    event: {
-                      type: 'terminal-status',
-                      sessionId: currentSessionId,
-                      windowId: windowItem.windowId,
-                      status: 'running',
-                      shell: metadata.shell,
-                      cwd: metadata.cwd
-                    }
-                  });
-                },
-                sendInput: async (input) => {
-                  const currentSessionId = sessionRef.current;
-                  if (!currentSessionId) {
-                    return;
-                  }
-                  await sendTerminalInput({
-                    sessionId: currentSessionId,
-                    windowId: windowItem.windowId,
-                    payload: input
-                  });
-                },
-                stop: async () => {
-                  const currentSessionId = sessionRef.current;
-                  if (!currentSessionId) {
-                    return;
-                  }
-                  await stopTerminal({
-                    sessionId: currentSessionId,
-                    windowId: windowItem.windowId
-                  });
-                }
-              },
-              recycleBin: {
-                listItems: async () => (await listRecycleBinItems()).items,
-                trash: async (path) => {
-                  const trashed = await trashHostFile({ path });
-                  window.dispatchEvent(
-                    new CustomEvent('aionios:fs-changed', { detail: { action: 'trash', path: trashed.originalPath } })
-                  );
-                  if (trashed.originalPath.endsWith('.aionios-app.json')) {
-                    await refreshPersistedApps();
-                  }
-                  return trashed;
-                },
-                restore: async (id) => {
-                  const restored = await restoreRecycleBinItem({ id });
-                  window.dispatchEvent(
-                    new CustomEvent('aionios:fs-changed', { detail: { action: 'restore', path: restored.restoredPath } })
-                  );
-                  if (restored.restoredPath.endsWith('.aionios-app.json')) {
-                    await refreshPersistedApps();
-                  }
-                  return restored;
-                },
-                deleteItem: async (id) => {
-                  await deleteRecycleBinItem({ id });
-                },
-                empty: async () => emptyRecycleBin()
-              }
-            };
-
             return (
               <WindowFrame
                 key={`${windowItem.windowId}:${windowItem.mountNonce}`}
@@ -1255,9 +1291,14 @@ export default function App() {
                   });
                 }}
               >
-                <WindowRuntime
+                <WindowRuntimeWithHostBridge
                   windowItem={windowItem}
-                  hostBridge={hostBridge}
+                  activeSessionId={activeSessionId}
+                  openApp={openApp}
+                  requestUpdateForWindow={requestUpdateForWindow}
+                  refreshPersistedApps={refreshPersistedApps}
+                  sessionRef={sessionRef}
+                  dispatch={dispatch}
                   terminalState={state.terminals[windowItem.windowId]}
                 />
               </WindowFrame>
