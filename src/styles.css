@@ -83,6 +83,51 @@ body,
   text-align: center;
 }
 
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 104px);
+  gap: 10px;
+  align-content: start;
+}
+
+.icon-tile {
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 10px;
+  padding: 10px 8px;
+  background: rgba(15, 23, 42, 0.35);
+  color: #e2e8f0;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.icon-tile:hover {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(147, 197, 253, 0.5);
+}
+
+.icon-tile--selected {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(147, 197, 253, 0.85);
+}
+
+.icon-tile__emoji {
+  font-size: 1.4rem;
+}
+
+.icon-tile__label {
+  font-size: 12px;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .window-canvas {
   position: absolute;
   inset: 16px;

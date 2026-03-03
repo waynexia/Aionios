@@ -59,13 +59,10 @@ export default {
               const frame = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${windowId}"]');
               if (!(frame instanceof HTMLElement)) return false;
               const selectedPath = frame.querySelector('[data-directory-selected]')?.textContent?.trim() ?? '';
-              const listButtons = Array.from(frame.querySelectorAll('[data-directory-list] button'));
-              const hasSavedEntry = listButtons.some(
-                (button) => button.textContent?.trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)}
-              );
+              const entry = frame.querySelector('button[data-directory-entry-path="' + ${JSON.stringify(DIRECTORY_DRAFT_PATH)} + '"]');
               const draftContent = frame.querySelector('[data-directory-content]')?.value ?? '';
               return selectedPath === ${JSON.stringify(DIRECTORY_DRAFT_PATH)} &&
-                hasSavedEntry &&
+                entry instanceof HTMLButtonElement &&
                 draftContent === ${JSON.stringify(DIRECTORY_DRAFT_CONTENT)};
             })()`
           )
