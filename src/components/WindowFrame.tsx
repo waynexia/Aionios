@@ -29,6 +29,7 @@ interface WindowFrameProps {
   onClose: () => void;
   onMinimize: () => void;
   onRequestUpdate?: () => void;
+  onRequestHistory?: () => void;
   children: ReactNode;
 }
 
@@ -42,6 +43,7 @@ export function WindowFrame({
   onClose,
   onMinimize,
   onRequestUpdate,
+  onRequestHistory,
   children
 }: WindowFrameProps) {
   const frameRef = useRef<HTMLElement | null>(null);
@@ -188,6 +190,17 @@ export function WindowFrame({
           </small>
         </div>
         <div className="window-frame__actions">
+          {onRequestHistory ? (
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => onRequestHistory()}
+              aria-label="Show revision history"
+              title="Revision history"
+            >
+              🕘
+            </button>
+          ) : null}
           {onRequestUpdate ? (
             <button
               type="button"

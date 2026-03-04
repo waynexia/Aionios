@@ -466,3 +466,175 @@ body,
   font-size: 12px;
   color: rgba(147, 197, 253, 0.85);
 }
+
+.revision-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(2, 6, 23, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+.revision-dialog {
+  width: min(680px, calc(100vw - 36px));
+  max-height: min(620px, calc(100vh - 36px));
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 18px 80px rgba(2, 6, 23, 0.7);
+  padding: 14px 14px 12px;
+  outline: none;
+}
+
+.revision-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.revision-dialog__heading {
+  display: grid;
+  gap: 2px;
+}
+
+.revision-dialog__heading strong {
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.revision-dialog__title {
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.revision-dialog__close {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: rgba(30, 41, 59, 0.75);
+  color: #e2e8f0;
+  cursor: pointer;
+}
+
+.revision-dialog__close:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.7);
+  outline-offset: 2px;
+}
+
+.revision-dialog__description {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.revision-dialog__list {
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 4px;
+}
+
+.revision-dialog__status {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.revision-dialog__status--error {
+  color: rgba(254, 202, 202, 0.9);
+}
+
+.revision-dialog__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.35);
+  padding: 10px 12px;
+}
+
+.revision-dialog__item--current {
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.revision-dialog__meta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.revision-dialog__meta-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.revision-dialog__meta-row--secondary {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 11px;
+}
+
+.revision-dialog__revision {
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.revision-dialog__badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  background: rgba(37, 99, 235, 0.25);
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  color: #bfdbfe;
+}
+
+.revision-dialog__tag {
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.revision-dialog__time {
+  opacity: 0.9;
+}
+
+.revision-dialog__actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.revision-dialog__button {
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, 0.75);
+}
+
+.revision-dialog__button:hover:enabled {
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.revision-dialog__button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

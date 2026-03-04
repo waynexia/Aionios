@@ -15,6 +15,7 @@ import { ContextMenu, type ContextMenuItem } from './components/ContextMenu';
 import { DesktopIcons } from './components/DesktopIcons';
 import { Taskbar } from './components/Taskbar';
 import { PromptDialog } from './components/PromptDialog';
+import { RevisionDialog } from './components/RevisionDialog';
 import { WindowFrame } from './components/WindowFrame';
 import { WindowRuntime } from './components/WindowRuntime';
 import type {
@@ -248,7 +249,8 @@ function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
       windows: updateWindow(state.windows, event.windowId, (windowItem) => ({
         ...windowItem,
         strategy: 'remount',
-        mountNonce: windowItem.mountNonce + 1
+        mountNonce: windowItem.mountNonce + 1,
+        revision: typeof event.revision === 'number' ? event.revision : windowItem.revision
       }))
     };
   }
@@ -455,11 +457,25 @@ export default function App() {
     | { mode: 'create' }
     | null
   >(null);
+  const [revisionDialog, setRevisionDialog] = useState<
+    | { windowId: string; title: string }
+    | null
+  >(null);
 
   useEffect(() => {
     filesRef.current = state.files;
     sessionRef.current = state.sessionId;
   }, [state.files, state.sessionId]);
+
+  useEffect(() => {
+    if (!revisionDialog) {
+      return;
+    }
+    if (state.windows.some((windowItem) => windowItem.windowId === revisionDialog.windowId)) {
+      return;
+    }
+    setRevisionDialog(null);
+  }, [revisionDialog, state.windows]);
 
   useEffect(() => {
     let active = true;
@@ -902,6 +918,15 @@ export default function App() {
                 showRevision={getAppDefinition(windowItem.appId)?.kind !== 'system'}
                 focused={windowItem.windowId === state.focusedWindowId}
                 onFocus={() => dispatch({ type: 'window-focus', windowId: windowItem.windowId })}
+                onRequestHistory={
+                  getAppDefinition(windowItem.appId)?.kind === 'system'
+                    ? undefined
+                    : () =>
+                        setRevisionDialog({
+                          windowId: windowItem.windowId,
+                          title: windowItem.title
+                        })
+                }
                 onRequestUpdate={
                   getAppDefinition(windowItem.appId)?.kind === 'system'
                     ? undefined
@@ -1025,6 +1050,19 @@ export default function App() {
           }
           setPromptDialog(null);
         }}
+      />
+      <RevisionDialog
+        open={Boolean(revisionDialog)}
+        sessionId={activeSessionId}
+        windowId={revisionDialog?.windowId ?? ''}
+        title={revisionDialog?.title ?? ''}
+        currentRevision={
+          revisionDialog
+            ? state.windows.find((windowItem) => windowItem.windowId === revisionDialog.windowId)?.revision ??
+              0
+            : 0
+        }
+        onClose={() => setRevisionDialog(null)}
       />
     </div>
   );

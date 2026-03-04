@@ -233,5 +233,85 @@ export default {
     if (!summary.includes('Last instruction:')) {
       throw new Error(`Expected updated mock summary to include last instruction, got: ${JSON.stringify(summary)}`);
     }
+
+    const updatedRevision = await ctx.evaluate(getRevisionExpression(windowId));
+    if (typeof updatedRevision !== 'number' || updatedRevision <= initialRevision) {
+      throw new Error(`Unable to resolve updated revision: ${String(updatedRevision)}`);
+    }
+
+    const historyOpened = await ctx.evaluate(
+      `(() => {
+        const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+        if (!(frame instanceof HTMLElement)) return false;
+        const button = frame.querySelector('.window-frame__actions button[aria-label="Show revision history"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!historyOpened) {
+      throw new Error('Unable to open revision history dialog');
+    }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate("document.querySelector('[data-revision-dialog]') instanceof HTMLElement")
+        ),
+      'Revision history dialog did not open'
+    );
+
+    await ctx.waitFor(
+      async () => {
+        const count = await ctx.evaluate(
+          "document.querySelectorAll('[data-revision-item]').length"
+        );
+        return typeof count === 'number' && count >= 2;
+      },
+      'Revision history did not list at least two revisions'
+    );
+
+    const rollbackClicked = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('[data-revision-rollback="1"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!rollbackClicked) {
+      throw new Error('Unable to click rollback button for revision 1');
+    }
+
+    await ctx.waitFor(
+      async () => {
+        const status = await getTaskbarStatus(ctx, windowId);
+        if (status !== 'ready') {
+          return false;
+        }
+        const revision = await ctx.evaluate(getRevisionExpression(windowId));
+        return revision === 1;
+      },
+      'LLM window did not rollback to revision 1'
+    );
+
+    const rolledBackSummary = await ctx.evaluate(
+      `(() => {
+        const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+        if (!(frame instanceof HTMLElement)) return '';
+        const paragraphs = Array.from(frame.querySelectorAll('p'));
+        for (const paragraph of paragraphs) {
+          const text = paragraph.textContent?.trim() ?? '';
+          if (text.includes('Last instruction:')) {
+            return text;
+          }
+        }
+        return '';
+      })()`
+    );
+    if (!rolledBackSummary.includes('Last instruction:') || !rolledBackSummary.includes('tag picker')) {
+      throw new Error(`Expected rolled-back summary to return to the open prompt, got: ${JSON.stringify(rolledBackSummary)}`);
+    }
   }
 };
