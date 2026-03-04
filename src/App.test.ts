@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { initialState, reducer } from './App';
+import { initialState, reducer } from './state/app-state';
 
 function buildStateWithWindow(canvas?: { width: number; height: number }) {
   const withSession = reducer(initialState, {

@@ -66,6 +66,8 @@ export const APP_CATALOG: AppDefinition[] = [
   }
 ];
 
+const APP_DEFINITION_BY_ID = new Map(APP_CATALOG.map((definition) => [definition.appId, definition]));
+
 export function getAppDefinition(appId: string) {
-  return APP_CATALOG.find((item) => item.appId === appId);
+  return APP_DEFINITION_BY_ID.get(appId);
 }
