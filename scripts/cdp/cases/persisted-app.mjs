@@ -282,5 +282,17 @@ export default {
     if (!reopenedClosed) {
       throw new Error('Unable to close reopened persisted app window');
     }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `document.querySelector(${JSON.stringify(
+              `.window-frame[data-window-id="${reopenedWindowId}"]`
+            )}) === null`
+          )
+        ),
+      'Reopened persisted app window did not close'
+    );
   }
 };

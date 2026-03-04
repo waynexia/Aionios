@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { nanoid } from 'nanoid';
-import { APP_DESCRIPTOR_EXTENSION } from './app-descriptors';
+import { APP_DESCRIPTOR_EXTENSIONS } from './app-descriptors';
 import type { HostFileSystem } from './host-fs';
 
 export interface RecycleBinItem {
@@ -51,9 +51,13 @@ async function moveFile(sourcePath: string, destinationPath: string) {
 }
 
 function splitFileName(name: string) {
-  if (name.endsWith(APP_DESCRIPTOR_EXTENSION)) {
-    const base = name.slice(0, Math.max(0, name.length - APP_DESCRIPTOR_EXTENSION.length));
-    return { base, extension: APP_DESCRIPTOR_EXTENSION };
+  const lower = name.toLowerCase();
+  for (const extension of APP_DESCRIPTOR_EXTENSIONS) {
+    if (lower.endsWith(extension)) {
+      const originalExtension = name.slice(-extension.length);
+      const base = name.slice(0, Math.max(0, name.length - originalExtension.length));
+      return { base, extension: originalExtension };
+    }
   }
   const dotIndex = name.lastIndexOf('.');
   if (dotIndex <= 0) {

@@ -1,6 +1,13 @@
 import { HostFileSystem } from './host-fs';
 
-export const APP_DESCRIPTOR_EXTENSION = '.aionios-app.json';
+export const APP_DESCRIPTOR_EXTENSION = '.app';
+export const LEGACY_APP_DESCRIPTOR_EXTENSION = '.aionios-app.json';
+export const APP_DESCRIPTOR_EXTENSIONS = [APP_DESCRIPTOR_EXTENSION, LEGACY_APP_DESCRIPTOR_EXTENSION] as const;
+
+export function isAppDescriptorPath(inputPath: string) {
+  const normalized = inputPath.trim().toLowerCase();
+  return APP_DESCRIPTOR_EXTENSIONS.some((extension) => normalized.endsWith(extension));
+}
 
 export interface AppDescriptorV1 {
   kind: 'aionios.app';
@@ -103,7 +110,7 @@ export async function listAppDescriptors(hostFs: HostFileSystem, input?: { direc
   const descriptors: PersistedAppDescriptor[] = [];
 
   for (const file of files) {
-    if (!file.path.endsWith(APP_DESCRIPTOR_EXTENSION)) {
+    if (!isAppDescriptorPath(file.path)) {
       continue;
     }
     const parsed = parseDescriptor(file.content);

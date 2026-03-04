@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_DESCRIPTOR_EXTENSION,
+  LEGACY_APP_DESCRIPTOR_EXTENSION,
+  isAppDescriptorPath,
   buildFileOpenWindowTitle,
   isMediaFilePath,
   parseAioniosAppDescriptor
@@ -47,7 +49,13 @@ describe('open-file helpers', () => {
   });
 
   it('keeps the descriptor extension stable', () => {
-    expect(APP_DESCRIPTOR_EXTENSION).toBe('.aionios-app.json');
+    expect(APP_DESCRIPTOR_EXTENSION).toBe('.app');
+    expect(LEGACY_APP_DESCRIPTOR_EXTENSION).toBe('.aionios-app.json');
+  });
+
+  it('detects app descriptor paths (including legacy extension)', () => {
+    expect(isAppDescriptorPath('apps/My App.app')).toBe(true);
+    expect(isAppDescriptorPath('apps/My App.aionios-app.json')).toBe(true);
+    expect(isAppDescriptorPath('apps/readme.md')).toBe(false);
   });
 });
-

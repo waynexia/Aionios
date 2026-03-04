@@ -1,4 +1,11 @@
-export const APP_DESCRIPTOR_EXTENSION = '.aionios-app.json';
+export const APP_DESCRIPTOR_EXTENSION = '.app';
+export const LEGACY_APP_DESCRIPTOR_EXTENSION = '.aionios-app.json';
+export const APP_DESCRIPTOR_EXTENSIONS = [APP_DESCRIPTOR_EXTENSION, LEGACY_APP_DESCRIPTOR_EXTENSION] as const;
+
+export function isAppDescriptorPath(inputPath: string) {
+  const normalized = stripQueryAndHash(inputPath.trim().toLowerCase());
+  return APP_DESCRIPTOR_EXTENSIONS.some((extension) => normalized.endsWith(extension));
+}
 
 export type ParsedAppDescriptor = {
   appId: string;
@@ -74,4 +81,3 @@ export function buildFileOpenWindowTitle(input: { appTitle: string; path: string
     baseName.length > maxBaseLength ? `${baseName.slice(0, Math.max(1, maxBaseLength - 1))}…` : baseName;
   return `${trimmedBase}${suffix}`;
 }
-

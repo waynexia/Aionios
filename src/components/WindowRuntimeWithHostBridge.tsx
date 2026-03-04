@@ -15,6 +15,7 @@ import {
   writeHostFile
 } from '../api/client';
 import { dispatchFsChanged } from '../aionios-events';
+import { isAppDescriptorPath } from '../open-file';
 import type { AppAction } from '../state/app-state';
 import type { DesktopWindow, HostBridge, TerminalStateSnapshot } from '../types';
 import { WindowRuntime } from './WindowRuntime';
@@ -114,7 +115,7 @@ export function WindowRuntimeWithHostBridge({
         trash: async (path) => {
           const trashed = await trashHostFile({ path });
           dispatchFsChanged({ action: 'trash', path: trashed.originalPath });
-          if (trashed.originalPath.endsWith('.aionios-app.json')) {
+          if (isAppDescriptorPath(trashed.originalPath)) {
             await refreshPersistedApps();
           }
           return trashed;
@@ -122,7 +123,7 @@ export function WindowRuntimeWithHostBridge({
         restore: async (id) => {
           const restored = await restoreRecycleBinItem({ id });
           dispatchFsChanged({ action: 'restore', path: restored.restoredPath });
-          if (restored.restoredPath.endsWith('.aionios-app.json')) {
+          if (isAppDescriptorPath(restored.restoredPath)) {
             await refreshPersistedApps();
           }
           return restored;

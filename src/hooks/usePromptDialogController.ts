@@ -33,8 +33,10 @@ export function usePromptDialogController(options: {
     if (promptDialog?.mode === 'create') {
       return {
         title: `Create New (save to ${promptDialog.directory})`,
-        description: `Describe what you want this new app to be. It will be saved in ${promptDialog.directory}.`,
-        placeholder: 'E.g. A kanban board with drag-and-drop, keyboard shortcuts, and saved state.',
+        description:
+          `Describe what you want to create. Aionios will choose a file extension (apps use .app; other common types include .svg, .md, .txt). ` +
+          `It will be saved in ${promptDialog.directory}.`,
+        placeholder: 'E.g. A kanban board app, a simple SVG icon, or a markdown slide deck.',
         initialValue: '',
         confirmLabel: 'Create'
       };
@@ -96,4 +98,3 @@ export function usePromptDialogController(options: {
     promptDialogProps
   };
 }
-

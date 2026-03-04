@@ -114,7 +114,7 @@ function resolveFileIcon(path: string) {
   if (!name) {
     return '📄';
   }
-  if (name.endsWith('.aionios-app.json')) {
+  if (name.endsWith('.app') || name.endsWith('.aionios-app.json')) {
     return '🧩';
   }
   if (name.endsWith('.md')) {
@@ -413,10 +413,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                 <div className="icon-grid">
                   {group.files.map((file) => {
                     const isSelected = file.path === selectedPath;
+                    const isDescriptor =
+                      file.path.toLowerCase().endsWith('.app') ||
+                      file.path.toLowerCase().endsWith('.aionios-app.json');
                     const descriptor =
-                      file.path.endsWith('.aionios-app.json') && typeof file.content === 'string'
-                        ? parseAppDescriptor(file.content)
-                        : null;
+                      isDescriptor && typeof file.content === 'string' ? parseAppDescriptor(file.content) : null;
                     const label = descriptor ? descriptor.title : fileNameFromPath(file.path);
                     const emoji = descriptor ? descriptor.icon : resolveFileIcon(file.path);
 

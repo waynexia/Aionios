@@ -63,7 +63,7 @@ function resolveFileIcon(path: string) {
   if (!name) {
     return '📄';
   }
-  if (name.endsWith('.aionios-app.json')) {
+  if (name.endsWith('.app') || name.endsWith('.aionios-app.json')) {
     return '🧩';
   }
   if (name.endsWith('.md')) {

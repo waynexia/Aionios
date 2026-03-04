@@ -77,6 +77,25 @@ function isUrlLike(value: string) {
   );
 }
 
+function looksLikeSvgMarkup(value: string) {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return false;
+  }
+  if (trimmed.startsWith('<svg')) {
+    return true;
+  }
+  if (trimmed.startsWith('<?xml') && trimmed.includes('<svg')) {
+    return true;
+  }
+  return trimmed.includes('<svg') && trimmed.includes('</svg>');
+}
+
+function toSvgDataUrl(svgMarkup: string) {
+  const encoded = encodeURIComponent(svgMarkup.trim());
+  return 'data:image/svg+xml;charset=utf-8,' + encoded;
+}
+
 export default function WindowApp({ host, windowState }: WindowProps) {
   const launchPath =
     windowState.launch && windowState.launch.kind === 'open-file'
@@ -145,8 +164,12 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     if (shouldResolveHostFile) {
       try {
         const content = (await host.readFile(requestedSource)).trim();
-        if (content && (isUrlLike(content) || detectMediaKind(content))) {
-          resolvedSource = content;
+        if (content) {
+          if (isUrlLike(content) || detectMediaKind(content)) {
+            resolvedSource = content;
+          } else if (requestedSource.toLowerCase().endsWith('.svg') && looksLikeSvgMarkup(content)) {
+            resolvedSource = toSvgDataUrl(content);
+          }
         }
       } catch (reason) {
         setStatus('Unable to read host file: ' + (reason as Error).message);
