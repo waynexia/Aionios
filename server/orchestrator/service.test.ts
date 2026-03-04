@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreferenceConfig } from '../config';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { PersistedAppStore } from '../storage/persisted-apps';
 
 const validGeneratedSource = `
 import React from 'react';
@@ -35,6 +39,19 @@ function createOrchestrator() {
   return new WindowOrchestrator(() => preferenceConfig);
 }
 
+async function createPersistedOrchestrator() {
+  const rootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'aionios-app-store-test-'));
+  const persistedAppStore = new PersistedAppStore({
+    rootDir,
+    managedPrefix: 'app-'
+  });
+  return {
+    rootDir,
+    persistedAppStore,
+    orchestrator: new WindowOrchestrator(() => preferenceConfig, { persistedAppStore })
+  };
+}
+
 function createDeferred<T>() {
   let resolve: (value: T) => void = () => undefined;
   let reject: (reason?: unknown) => void = () => undefined;
@@ -62,6 +79,22 @@ async function waitForRevision(
   throw new Error(`Timed out waiting for revision ${expectedRevision}`);
 }
 
+async function waitForPersistedRevision(
+  persistedAppStore: PersistedAppStore,
+  appId: string,
+  expectedRevision: number
+) {
+  const started = Date.now();
+  while (Date.now() - started < 1000) {
+    const snapshot = await persistedAppStore.read(appId);
+    if (snapshot?.revision === expectedRevision) {
+      return snapshot;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error(`Timed out waiting for persisted revision ${expectedRevision}`);
+}
+
 describe('WindowOrchestrator', () => {
   beforeEach(() => {
     generateMock.mockReset();
@@ -71,10 +104,10 @@ describe('WindowOrchestrator', () => {
     });
   });
 
-  it('opens system apps as ready without async generation', () => {
+  it('opens system apps as ready without async generation', async () => {
     const orchestrator = createOrchestrator();
     const sessionId = orchestrator.createSession();
-    const snapshot = orchestrator.openWindow({
+    const snapshot = await orchestrator.openWindow({
       sessionId,
       windowId: 'window-system-terminal',
       appId: 'terminal',
@@ -89,10 +122,10 @@ describe('WindowOrchestrator', () => {
     expect(moduleSnapshot.source).toContain('@xterm/xterm');
   });
 
-  it('keeps system app updates as no-op', () => {
+  it('keeps system app updates as no-op', async () => {
     const orchestrator = createOrchestrator();
     const sessionId = orchestrator.createSession();
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId: 'window-system-preference',
       appId: 'preference',
@@ -109,10 +142,10 @@ describe('WindowOrchestrator', () => {
     expect(snapshot.revision).toBe(1);
   });
 
-  it('still opens llm apps in loading state', () => {
+  it('still opens llm apps in loading state', async () => {
     const orchestrator = createOrchestrator();
     const sessionId = orchestrator.createSession();
-    const snapshot = orchestrator.openWindow({
+    const snapshot = await orchestrator.openWindow({
       sessionId,
       windowId: 'window-llm-notes',
       appId: 'notes',
@@ -123,6 +156,53 @@ describe('WindowOrchestrator', () => {
     expect(snapshot.revision).toBe(0);
   });
 
+  it('loads persisted app source when available', async () => {
+    const { persistedAppStore, orchestrator } = await createPersistedOrchestrator();
+    const appId = 'app-persisted';
+
+    await persistedAppStore.write({
+      appId,
+      source: validGeneratedSource,
+      revision: 3,
+      title: 'Persisted'
+    });
+
+    const sessionId = orchestrator.createSession();
+    const snapshot = await orchestrator.openWindow({
+      sessionId,
+      windowId: 'window-persisted',
+      appId,
+      title: 'Persisted'
+    });
+
+    expect(snapshot.status).toBe('ready');
+    expect(snapshot.revision).toBe(3);
+    expect(generateMock).not.toHaveBeenCalled();
+
+    const moduleSnapshot = orchestrator.getWindowModuleSource(sessionId, 'window-persisted');
+    expect(moduleSnapshot.source).toContain('Ready');
+  });
+
+  it('persists generated revisions for managed app ids', async () => {
+    const { persistedAppStore, orchestrator } = await createPersistedOrchestrator();
+    const sessionId = orchestrator.createSession();
+    const appId = 'app-new';
+    const windowId = 'window-managed';
+
+    await orchestrator.openWindow({
+      sessionId,
+      windowId,
+      appId,
+      title: 'Managed app'
+    });
+
+    await waitForRevision(orchestrator, sessionId, windowId, 1);
+
+    const persisted = await waitForPersistedRevision(persistedAppStore, appId, 1);
+    expect(persisted.revision).toBe(1);
+    expect(persisted.source).toContain('Ready');
+  });
+
   it('passes open-window instruction into initial generation', async () => {
     const orchestrator = createOrchestrator();
     const sessionId = orchestrator.createSession();
@@ -130,7 +210,7 @@ describe('WindowOrchestrator', () => {
     const deferred = createDeferred<{ source: string; backend: string }>();
     generateMock.mockReturnValueOnce(deferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',
@@ -164,7 +244,7 @@ describe('WindowOrchestrator', () => {
     const deferred = createDeferred<{ source: string; backend: string }>();
     generateMock.mockReturnValueOnce(deferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',
@@ -193,7 +273,7 @@ describe('WindowOrchestrator', () => {
       .mockReturnValueOnce(initialDeferred.promise)
       .mockReturnValueOnce(updateDeferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',
@@ -255,7 +335,7 @@ describe('WindowOrchestrator', () => {
       .mockReturnValueOnce(updateDeferred.promise)
       .mockReturnValueOnce(promptDeferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',
@@ -330,7 +410,7 @@ describe('WindowOrchestrator', () => {
       .mockReturnValueOnce(initialDeferred.promise)
       .mockReturnValueOnce(updateDeferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',
@@ -392,7 +472,7 @@ export default function WindowApp() {
       .mockReturnValueOnce(initialDeferred.promise)
       .mockReturnValueOnce(updateDeferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',
@@ -464,7 +544,7 @@ export default function WindowApp() {
       .mockReturnValueOnce(updateDeferred.promise)
       .mockReturnValueOnce(regenerateDeferred.promise);
 
-    orchestrator.openWindow({
+    await orchestrator.openWindow({
       sessionId,
       windowId,
       appId: 'notes',

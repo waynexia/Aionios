@@ -1,4 +1,6 @@
 import type {
+  HostFileEntry,
+  PersistedAppDescriptor,
   PreferenceConfig,
   PreferenceConfigUpdate,
   ServerWindowSnapshot,
@@ -15,8 +17,19 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     ...init
   });
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `Request failed with ${response.status}`);
+    const rawMessage = await response.text();
+    let parsedMessage: string | null = null;
+    if (rawMessage) {
+      try {
+        const parsed = JSON.parse(rawMessage) as { message?: unknown };
+        if (parsed && typeof parsed.message === 'string' && parsed.message.trim().length > 0) {
+          parsedMessage = parsed.message.trim();
+        }
+      } catch {
+        // ignore JSON parse errors
+      }
+    }
+    throw new Error(parsedMessage || rawMessage || `Request failed with ${response.status}`);
   }
   return (await response.json()) as T;
 }
@@ -202,4 +215,45 @@ export async function stopTerminal(input: { sessionId: string; windowId: string 
       method: 'POST'
     }
   );
+}
+
+export async function listHostFiles() {
+  return requestJson<{ files: HostFileEntry[] }>('/api/fs/files');
+}
+
+export async function readHostFile(input: { path: string }) {
+  return requestJson<{ content: string }>(`/api/fs/file?path=${encodeURIComponent(input.path)}`);
+}
+
+export async function writeHostFile(input: { path: string; content: string }) {
+  return requestJson<{ ok: true }>('/api/fs/file', {
+    method: 'PUT',
+    body: JSON.stringify({
+      path: input.path,
+      content: input.content
+    })
+  });
+}
+
+export async function listPersistedApps(input?: { directory?: string }) {
+  const query =
+    typeof input?.directory === 'string'
+      ? `?directory=${encodeURIComponent(input.directory)}`
+      : '';
+  return requestJson<{ apps: PersistedAppDescriptor[] }>(`/api/apps${query}`);
+}
+
+export async function createPersistedApp(input: {
+  directory?: string;
+  title: string;
+  icon?: string;
+}) {
+  return requestJson<PersistedAppDescriptor>('/api/apps', {
+    method: 'POST',
+    body: JSON.stringify({
+      directory: input.directory,
+      title: input.title,
+      icon: input.icon
+    })
+  });
 }

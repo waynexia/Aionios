@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { PreferenceConfig } from '../config';
+import type { PersistedAppStore } from '../storage/persisted-apps';
 import { buildGenerationPrompt, createContextEntry } from './context';
 import { SessionEventBus } from './event-bus';
 import { createLlmProvider } from './llm/provider';
@@ -112,8 +113,14 @@ export class WindowOrchestrator {
   private moduleBridge?: ModuleUpdateBridge;
   private readonly windowTaskQueue = new Map<string, Promise<void>>();
   private readonly windowRollbackBarrier = new Map<string, number>();
+  private readonly persistedAppStore?: PersistedAppStore;
 
-  constructor(private readonly readConfig: () => PreferenceConfig) {}
+  constructor(
+    private readonly readConfig: () => PreferenceConfig,
+    options?: { persistedAppStore?: PersistedAppStore }
+  ) {
+    this.persistedAppStore = options?.persistedAppStore;
+  }
 
   private getRollbackBarrier(sessionId: string, windowId: string) {
     const key = buildWindowKey(sessionId, windowId);
@@ -207,7 +214,7 @@ export class WindowOrchestrator {
     };
   }
 
-  openWindow(input: OpenWindowInput): WindowSnapshot {
+  async openWindow(input: OpenWindowInput): Promise<WindowSnapshot> {
     const windowRecord = this.store.createWindow(input);
     this.store.addContextEntry(
       input.sessionId,
@@ -259,6 +266,68 @@ export class WindowOrchestrator {
         status: windowRecord.status,
         revision: revision.revision
       };
+    }
+
+    const persistedSnapshot = this.persistedAppStore
+      ? await this.persistedAppStore.read(windowRecord.appId)
+      : null;
+    if (persistedSnapshot) {
+      this.store.loadRevision(input.sessionId, input.windowId, {
+        revision: persistedSnapshot.revision,
+        source: persistedSnapshot.source,
+        prompt: '[persisted module preload]',
+        strategy: 'remount',
+        backend: 'persisted',
+        generatedAt: persistedSnapshot.updatedAt
+      });
+
+      this.store.addContextEntry(
+        input.sessionId,
+        input.windowId,
+        createContextEntry(
+          'assistant',
+          `Loaded persisted app revision ${persistedSnapshot.revision}.`
+        )
+      );
+
+      if (!input.instruction) {
+        this.eventBus.publish({
+          type: 'window-ready',
+          sessionId: input.sessionId,
+          windowId: input.windowId,
+          appId: input.appId,
+          title: input.title,
+          status: 'ready',
+          revision: persistedSnapshot.revision,
+          strategy: 'remount'
+        });
+        return this.getWindowSnapshot(input.sessionId, input.windowId);
+      }
+
+      this.store.setLoading(input.sessionId, input.windowId);
+      this.eventBus.publish({
+        type: 'window-status',
+        sessionId: input.sessionId,
+        windowId: input.windowId,
+        appId: input.appId,
+        title: input.title,
+        status: 'loading',
+        revision: persistedSnapshot.revision,
+        strategy: 'remount'
+      });
+
+      const rollbackBarrier = this.getRollbackBarrier(input.sessionId, input.windowId);
+      void this.enqueueWindowTask(input.sessionId, input.windowId, async () => {
+        await this.generateRevision({
+          sessionId: input.sessionId,
+          windowId: input.windowId,
+          reason: 'action',
+          instruction: input.instruction,
+          rollbackBarrier
+        });
+      });
+
+      return this.getWindowSnapshot(input.sessionId, input.windowId);
     }
 
     this.eventBus.publish({
@@ -613,6 +682,25 @@ export default function WindowApp() {
         windowId,
         createContextEntry('assistant', `Generated revision ${revision.revision} with ${generated.backend}.`)
       );
+
+      if (this.persistedAppStore?.isManagedAppId(record.appId)) {
+        try {
+          await this.persistedAppStore.write({
+            appId: record.appId,
+            source: generated.source,
+            revision: revision.revision,
+            title: record.title
+          });
+        } catch (error) {
+          const message = (error as Error).message;
+          console.error('[aionios] failed to persist app revision', record.appId, error);
+          this.store.addContextEntry(
+            sessionId,
+            windowId,
+            createContextEntry('assistant', `Warning: unable to persist app source: ${message}`)
+          );
+        }
+      }
 
       const strategyResult = this.moduleBridge
         ? await this.moduleBridge.pushWindowUpdate(sessionId, windowId, plannedStrategy)

@@ -1,9 +1,13 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
+import { nanoid } from 'nanoid';
 import { createServer as createViteServer } from 'vite';
 import { PreferenceConfigStore } from './config';
 import { WindowOrchestrator } from './orchestrator';
+import { createAppDescriptor, listAppDescriptors } from './storage/app-descriptors';
+import { HostFileSystem } from './storage/host-fs';
+import { PersistedAppStore } from './storage/persisted-apps';
 import { TerminalManager } from './terminal/manager';
 import { attachTerminalWebSocketServer } from './terminal/ws';
 import {
@@ -44,13 +48,33 @@ function parseArgs(argv: string[]) {
 async function startServer() {
   const app = express();
   const args = parseArgs(process.argv.slice(2));
+
+  const dataDir = (() => {
+    if (!args.configPath) {
+      return path.resolve(process.cwd(), '.aionios');
+    }
+    const configDir = path.dirname(args.configPath);
+    return path.basename(configDir) === '.aionios'
+      ? configDir
+      : path.join(configDir, '.aionios');
+  })();
+  const hostFs = new HostFileSystem({
+    rootDir: path.join(dataDir, 'fs')
+  });
+  const persistedAppStore = new PersistedAppStore({
+    rootDir: path.join(dataDir, 'tmp', 'apps'),
+    managedPrefix: 'app-'
+  });
+
   const preferenceConfigStore = new PreferenceConfigStore({
     filePath: args.configPath ?? undefined
   });
   await preferenceConfigStore.load();
   const initialConfig = preferenceConfigStore.getConfig();
 
-  const orchestrator = new WindowOrchestrator(() => preferenceConfigStore.getConfig());
+  const orchestrator = new WindowOrchestrator(() => preferenceConfigStore.getConfig(), {
+    persistedAppStore
+  });
   const terminalManager = new TerminalManager((event) => {
     orchestrator.publishSessionEvent(event);
   }, () => preferenceConfigStore.getConfig());
@@ -68,6 +92,123 @@ async function startServer() {
   orchestrator.attachModuleBridge(new ViteWindowModuleBridge(vite));
 
   app.use(express.json());
+
+  app.get('/api/apps', async (request, response) => {
+    const directory = request.query.directory;
+    if (directory !== undefined && typeof directory !== 'string') {
+      response.status(400).json({
+        message: 'directory must be a string when provided.'
+      });
+      return;
+    }
+    try {
+      const apps = await listAppDescriptors(
+        hostFs,
+        typeof directory === 'string' ? { directory } : undefined
+      );
+      response.status(200).json({ apps });
+    } catch (error) {
+      response.status(400).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.post('/api/apps', async (request, response) => {
+    const { directory, title, icon } = request.body as {
+      directory?: unknown;
+      title?: unknown;
+      icon?: unknown;
+    };
+    if (directory !== undefined && typeof directory !== 'string') {
+      response.status(400).json({
+        message: 'directory must be a string when provided.'
+      });
+      return;
+    }
+    if (typeof title !== 'string' || title.trim().length === 0) {
+      response.status(400).json({
+        message: 'title is required.'
+      });
+      return;
+    }
+    if (icon !== undefined && typeof icon !== 'string') {
+      response.status(400).json({
+        message: 'icon must be a string when provided.'
+      });
+      return;
+    }
+
+    const appId = `app-${nanoid(10)}`;
+    try {
+      const descriptor = await createAppDescriptor(hostFs, {
+        directory,
+        appId,
+        title: title.trim(),
+        icon
+      });
+      response.status(201).json(descriptor);
+    } catch (error) {
+      response.status(400).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.get('/api/fs/files', async (_request, response) => {
+    try {
+      const files = await hostFs.listFiles();
+      response.status(200).json({ files });
+    } catch (error) {
+      response.status(500).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.get('/api/fs/file', async (request, response) => {
+    const requestedPath = request.query.path;
+    if (typeof requestedPath !== 'string' || requestedPath.trim().length === 0) {
+      response.status(400).json({
+        message: 'path is required.'
+      });
+      return;
+    }
+
+    try {
+      const content = await hostFs.readFile(requestedPath);
+      response.status(200).json({ content });
+    } catch (error) {
+      const message = (error as Error).message;
+      const code = (error as NodeJS.ErrnoException).code;
+      response.status(code === 'ENOENT' ? 404 : 400).json({ message });
+    }
+  });
+
+  app.put('/api/fs/file', async (request, response) => {
+    const { path: virtualPath, content } = request.body as { path?: unknown; content?: unknown };
+    if (typeof virtualPath !== 'string' || virtualPath.trim().length === 0) {
+      response.status(400).json({
+        message: 'path is required.'
+      });
+      return;
+    }
+    if (typeof content !== 'string') {
+      response.status(400).json({
+        message: 'content must be a string.'
+      });
+      return;
+    }
+
+    try {
+      await hostFs.writeFile(virtualPath, content);
+      response.status(200).json({ ok: true });
+    } catch (error) {
+      response.status(400).json({
+        message: (error as Error).message
+      });
+    }
+  });
 
   app.post('/api/sessions', (_request, response) => {
     const sessionId = orchestrator.createSession();
@@ -225,7 +366,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/sessions/:sessionId/windows/open', (request, response) => {
+  app.post('/api/sessions/:sessionId/windows/open', async (request, response) => {
     const { sessionId } = request.params;
     const { windowId, appId, title, instruction } = request.body as {
       windowId?: string;
@@ -250,7 +391,7 @@ async function startServer() {
         ? instruction.trim()
         : undefined;
     try {
-      const snapshot = orchestrator.openWindow({
+      const snapshot = await orchestrator.openWindow({
         sessionId,
         windowId,
         appId,

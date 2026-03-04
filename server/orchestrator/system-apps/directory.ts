@@ -12,6 +12,7 @@ type DirectoryGroup = {
 
 type WindowProps = {
   host: {
+    openApp: (appId: string) => Promise<void>;
     listFiles: () => Promise<Array<FileEntry | string>>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
@@ -68,6 +69,25 @@ function toDirectoryGroups(paths: string[]): DirectoryGroup[] {
       }
       return left.directory.localeCompare(right.directory, 'en-US');
     });
+}
+
+function parseAppDescriptor(content: string): { appId: string; title?: string } | null {
+  try {
+    const parsed = JSON.parse(content);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    if (parsed.kind !== 'aionios.app' || parsed.version !== 1) {
+      return null;
+    }
+    if (typeof parsed.appId !== 'string' || parsed.appId.trim().length === 0) {
+      return null;
+    }
+    const title = typeof parsed.title === 'string' ? parsed.title.trim() : undefined;
+    return { appId: parsed.appId.trim(), title };
+  } catch {
+    return null;
+  }
 }
 
 export default function WindowApp({ host, windowState }: WindowProps) {
@@ -151,6 +171,12 @@ export default function WindowApp({ host, windowState }: WindowProps) {
 
   const groups = useMemo(() => toDirectoryGroups(paths), [paths]);
   const selectedLabel = selectedPath ?? '(new file)';
+  const selectedDescriptor = useMemo(() => {
+    if (!selectedPath || !selectedPath.endsWith('.aionios-app.json')) {
+      return null;
+    }
+    return parseAppDescriptor(draftContent);
+  }, [draftContent, selectedPath]);
   const canSave = !saving && !loadingList && draftPath.trim().length > 0;
 
   function createNewFileDraft() {
@@ -212,20 +238,41 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         <span data-directory-selected style={{ fontSize: 12, color: '#bfdbfe' }}>
           {selectedLabel}
         </span>
-        <button
-          type="button"
-          onClick={createNewFileDraft}
-          style={{
-            borderRadius: 8,
-            border: '1px solid rgba(148,163,184,0.4)',
-            background: 'transparent',
-            color: '#e2e8f0',
-            padding: '6px 10px',
-            cursor: 'pointer'
-          }}
-        >
-          New File
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {selectedDescriptor ? (
+            <button
+              type="button"
+              onClick={() => {
+                void host.openApp(selectedDescriptor.appId);
+              }}
+              style={{
+                borderRadius: 8,
+                border: '1px solid rgba(148,163,184,0.4)',
+                background: 'rgba(37,99,235,0.2)',
+                color: '#e2e8f0',
+                padding: '6px 10px',
+                cursor: 'pointer'
+              }}
+              title={selectedDescriptor.title ? 'Open ' + selectedDescriptor.title : 'Open app'}
+            >
+              Open App
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={createNewFileDraft}
+            style={{
+              borderRadius: 8,
+              border: '1px solid rgba(148,163,184,0.4)',
+              background: 'transparent',
+              color: '#e2e8f0',
+              padding: '6px 10px',
+              cursor: 'pointer'
+            }}
+          >
+            New File
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(260px, 2fr)', gap: 10, minHeight: 0 }}>
@@ -245,11 +292,16 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>No files yet.</p>
           ) : (
             groups.map((group) => (
-              <div key={group.directory} style={{ display: 'grid', gap: 4, marginBottom: 10 }}>
+              <div
+                key={group.directory}
+                data-directory-group={group.directory}
+                style={{ display: 'grid', gap: 4, marginBottom: 10 }}
+              >
                 <strong style={{ fontSize: 12, color: '#93c5fd' }}>{group.directory}</strong>
                 {group.files.map((path) => (
                   <button
                     key={path}
+                    data-directory-entry-path={path}
                     type="button"
                     onClick={() => setSelectedPath(path)}
                     style={{

@@ -56,6 +56,16 @@ export interface HostFileEntry {
   updatedAt: string;
 }
 
+export interface PersistedAppDescriptor {
+  appId: string;
+  title: string;
+  icon: string;
+  path: string;
+  directory: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WindowModuleState {
   title: string;
   revision: number;

@@ -147,6 +147,14 @@ export class SessionStore {
     return revision;
   }
 
+  loadRevision(sessionId: string, windowId: string, revision: WindowRevision) {
+    const windowRecord = this.mustGetWindow(sessionId, windowId);
+    windowRecord.revisions = [revision];
+    windowRecord.status = 'ready';
+    windowRecord.error = undefined;
+    windowRecord.updatedAt = revision.generatedAt;
+  }
+
   rollbackToRevision(sessionId: string, windowId: string, targetRevision: number) {
     const windowRecord = this.mustGetWindow(sessionId, windowId);
     const revision = windowRecord.revisions.find((entry) => entry.revision === targetRevision);
