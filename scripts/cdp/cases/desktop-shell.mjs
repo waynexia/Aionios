@@ -14,7 +14,7 @@ export default {
 
     let shikiOk = null;
     try {
-      shikiOk = await ctx.evaluate("import('shiki').then(() => true).catch(() => false)");
+      shikiOk = await ctx.evaluate("import('shiki/bundle/web').then(() => true).catch(() => false)");
     } catch {
       // Vite may reload after first dependency optimization; re-check shell below.
     }

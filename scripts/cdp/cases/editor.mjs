@@ -146,6 +146,23 @@ export default {
       'Editor did not persist edited content to host FS'
     );
 
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
+              const frame = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"]');
+              if (!(frame instanceof HTMLElement)) return false;
+              const preview = frame.querySelector('[data-editor-preview]');
+              if (!(preview instanceof HTMLElement)) return false;
+              const html = preview.innerHTML ?? '';
+              return html.includes('<span') && html.includes('class="shiki');
+            })()`
+          )
+        ),
+      'Editor did not apply Shiki syntax highlighting'
+    );
+
     const editorUiUpdated = await ctx.evaluate(
       `(() => {
         const frame = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"]');
