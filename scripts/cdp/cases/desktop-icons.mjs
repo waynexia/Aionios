@@ -11,26 +11,36 @@ export default {
       'Terminal desktop icon'
     );
 
-    await ctx.Input.dispatchMouseEvent({
-      type: 'mouseMoved',
-      x: iconAnchor.x,
-      y: iconAnchor.y,
-      button: 'none'
-    });
-    await ctx.Input.dispatchMouseEvent({
-      type: 'mousePressed',
-      x: iconAnchor.x,
-      y: iconAnchor.y,
-      button: 'right',
-      clickCount: 1
-    });
-    await ctx.Input.dispatchMouseEvent({
-      type: 'mouseReleased',
-      x: iconAnchor.x,
-      y: iconAnchor.y,
-      button: 'right',
-      clickCount: 1
-    });
+    const contextMenuDispatched = await ctx.evaluate(
+      `(() => {
+        const icon = document.querySelector('.desktop-icon[data-app-id="terminal"]');
+        if (!(icon instanceof HTMLElement)) {
+          return false;
+        }
+        icon.scrollIntoView({ block: 'center', inline: 'center' });
+        const event = new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: ${Math.round(iconAnchor.x)},
+          clientY: ${Math.round(iconAnchor.y)},
+          button: 2,
+          buttons: 2
+        });
+        icon.dispatchEvent(event);
+        return true;
+      })()`
+    );
+    if (!contextMenuDispatched) {
+      throw new Error('Unable to dispatch desktop icon context menu event');
+    }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate("document.querySelector('[data-context-menu]') instanceof HTMLElement")
+        ),
+      'Desktop context menu did not open after icon right click'
+    );
 
     await ctx.waitFor(
       async () =>

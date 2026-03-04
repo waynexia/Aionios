@@ -22,9 +22,12 @@ interface IconDragSession {
 
 const ICON_INITIAL_X = 8;
 const ICON_INITIAL_Y = 8;
+const ICON_HORIZONTAL_SPACING = 124;
 const ICON_VERTICAL_SPACING = 94;
 const DRAG_THRESHOLD_PX = 3;
 const SUPPRESS_CLICK_MS = 250;
+const ESTIMATED_TASKBAR_HEIGHT_PX = 54;
+const ESTIMATED_WORKSPACE_INSET_PX = 32;
 
 function clamp(value: number, min: number, max: number) {
   if (value < min) {
@@ -36,12 +39,34 @@ function clamp(value: number, min: number, max: number) {
   return value;
 }
 
+function getMaxRows(availableHeight: number) {
+  return Math.max(1, Math.floor((availableHeight - ICON_INITIAL_Y) / ICON_VERTICAL_SPACING));
+}
+
+function getInitialMaxRows() {
+  if (typeof window === 'undefined') {
+    return 7;
+  }
+  const estimatedHeight = Math.max(
+    1,
+    window.innerHeight - ESTIMATED_TASKBAR_HEIGHT_PX - ESTIMATED_WORKSPACE_INSET_PX
+  );
+  return getMaxRows(estimatedHeight);
+}
+
+function positionForIndex(index: number, maxRows: number): IconPosition {
+  const row = index % maxRows;
+  const col = Math.floor(index / maxRows);
+  return {
+    x: ICON_INITIAL_X + col * ICON_HORIZONTAL_SPACING,
+    y: ICON_INITIAL_Y + row * ICON_VERTICAL_SPACING
+  };
+}
+
 function createDefaultPositions(apps: AppDefinition[]) {
+  const maxRows = getInitialMaxRows();
   return apps.reduce<Record<string, IconPosition>>((acc, app, index) => {
-    acc[app.appId] = {
-      x: ICON_INITIAL_X,
-      y: ICON_INITIAL_Y + index * ICON_VERTICAL_SPACING
-    };
+    acc[app.appId] = positionForIndex(index, maxRows);
     return acc;
   }, {});
 }
@@ -64,12 +89,11 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     setPositions((current) => {
       const next = { ...current };
       let changed = false;
+      const container = containerRef.current;
+      const maxRows = container ? getMaxRows(container.clientHeight) : getInitialMaxRows();
       for (const app of apps) {
         if (!next[app.appId]) {
-          next[app.appId] = {
-            x: ICON_INITIAL_X,
-            y: ICON_INITIAL_Y + Object.keys(next).length * ICON_VERTICAL_SPACING
-          };
+          next[app.appId] = positionForIndex(Object.keys(next).length, maxRows);
           changed = true;
         }
       }
@@ -100,14 +124,21 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     setSelectedAppId(null);
   };
 
+  const onDesktopMouseDown = (event: ReactMouseEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    setSelectedAppId(null);
+  };
+
   const onIconPointerDown = (
     event: ReactPointerEvent<HTMLButtonElement>,
     appId: string
   ) => {
+    setSelectedAppId(appId);
     if (event.button !== 0) {
       return;
     }
-    setSelectedAppId(appId);
     const container = containerRef.current;
     if (!container) {
       return;
@@ -190,6 +221,10 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     dragSessionRef.current = null;
   };
 
+  const onIconMouseDown = (appId: string) => {
+    setSelectedAppId(appId);
+  };
+
   const onIconClick = (event: ReactMouseEvent<HTMLButtonElement>, appId: string) => {
     const suppressUntil = suppressedOpenUntilRef.current[appId] ?? 0;
     if (suppressUntil > Date.now()) {
@@ -223,6 +258,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
       className="desktop-icons"
       aria-label="Desktop apps"
       onPointerDown={onDesktopPointerDown}
+      onMouseDown={onDesktopMouseDown}
     >
       {apps.map((app) => {
         const position = positions[app.appId] ?? {
@@ -243,6 +279,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
             onPointerMove={(event) => onIconPointerMove(event, app.appId)}
             onPointerUp={(event) => onIconPointerEnd(event, app.appId)}
             onPointerCancel={(event) => onIconPointerEnd(event, app.appId)}
+            onMouseDown={() => onIconMouseDown(app.appId)}
             onClick={(event) => onIconClick(event, app.appId)}
             onDoubleClick={(event) => onIconDoubleClick(event, app.appId)}
             onContextMenu={() => onIconContextMenu(app.appId)}

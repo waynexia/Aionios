@@ -7,6 +7,7 @@ import editor from './editor.mjs';
 import finalState from './final-state.mjs';
 import llmUpdate from './llm-update.mjs';
 import media from './media.mjs';
+import persistedApp from './persisted-app.mjs';
 import preference from './preference.mjs';
 import taskbarClock from './taskbar-clock.mjs';
 import terminal from './terminal.mjs';
@@ -16,6 +17,7 @@ export const cases = [
   brandingIcons,
   taskbarClock,
   contextMenu,
+  persistedApp,
   desktopIcons,
   llmUpdate,
   terminal,

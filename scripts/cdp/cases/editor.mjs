@@ -72,6 +72,19 @@ export default {
       'Editor did not load selected file content'
     );
 
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
+              const textarea = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"] [data-editor-textarea]');
+              return textarea instanceof HTMLTextAreaElement && !textarea.disabled;
+            })()`
+          )
+        ),
+      'Editor textarea did not become editable'
+    );
+
     const editorEdited = await ctx.evaluate(
       `(() => {
         const frame = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"]');

@@ -3,13 +3,18 @@ import {
   branchWindowRevision,
   closeWindow,
   createSession,
+  createPersistedApp,
   getPreferenceConfig,
+  listHostFiles,
+  listPersistedApps,
   openWindow,
+  readHostFile,
   requestWindowUpdate,
   sendTerminalInput,
   startTerminal,
   stopTerminal,
-  updatePreferenceConfig
+  updatePreferenceConfig,
+  writeHostFile
 } from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
 import { ContextMenu, type ContextMenuItem } from './components/ContextMenu';
@@ -21,10 +26,11 @@ import { LlmOutputDialog } from './components/LlmOutputDialog';
 import { WindowFrame } from './components/WindowFrame';
 import { WindowRuntime } from './components/WindowRuntime';
 import type {
+  AppDefinition,
   ClientWindowStatus,
   DesktopWindow,
   HostBridge,
-  HostFileEntry,
+  PersistedAppDescriptor,
   ServerWindowEvent,
   TerminalStateSnapshot,
   UpdateStrategy,
@@ -44,7 +50,6 @@ interface AppState {
   windows: DesktopWindow[];
   focusedWindowId?: string;
   nextZIndex: number;
-  files: Record<string, HostFileEntry>;
   terminals: Record<string, TerminalStateSnapshot>;
   llmOutputs: Record<string, string>;
 }
@@ -102,11 +107,6 @@ type AppAction =
   | {
       type: 'llm-output-clear';
       windowId: string;
-    }
-  | {
-      type: 'file-write';
-      path: string;
-      content: string;
     };
 
 const MAX_TERMINAL_BUFFER_CHARS = 40_000;
@@ -121,7 +121,6 @@ const WINDOW_CASCADE_LIMIT = 6;
 export const initialState: AppState = {
   windows: [],
   nextZIndex: 10,
-  files: {},
   terminals: {},
   llmOutputs: {}
 };
@@ -456,19 +455,6 @@ export function reducer(state: AppState, action: AppAction): AppState {
           [action.windowId]: ''
         }
       };
-    case 'file-write': {
-      return {
-        ...state,
-        files: {
-          ...state.files,
-          [action.path]: {
-            path: action.path,
-            content: action.content,
-            updatedAt: new Date().toISOString()
-          }
-        }
-      };
-    }
     default:
       return state;
   }
@@ -495,20 +481,30 @@ function deriveWindowTitleFromInstruction(instruction: string) {
   return `${collapsed.slice(0, maxLength - 1)}…`;
 }
 
+function deriveDirectoryFromVirtualPath(virtualPath: string) {
+  const trimmed = virtualPath.replaceAll('\\', '/').trim().replace(/^\/+/, '');
+  const index = trimmed.lastIndexOf('/');
+  if (index === -1) {
+    return '/';
+  }
+  const directory = trimmed.slice(0, index);
+  return directory.length > 0 ? directory : '/';
+}
+
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const filesRef = useRef(state.files);
   const sessionRef = useRef(state.sessionId);
   const windowCanvasRef = useRef<HTMLElement | null>(null);
   const [contextMenu, setContextMenu] = useState<
-    | { kind: 'desktop'; x: number; y: number }
+    | { kind: 'desktop'; x: number; y: number; directory: string }
+    | { kind: 'directory'; x: number; y: number; directory: string }
     | { kind: 'icon'; x: number; y: number; appId: string }
     | null
   >(null);
   const [promptDialog, setPromptDialog] = useState<
     | { mode: 'update'; windowId: string; title: string }
     | { mode: 'open'; appId: string; title: string; hint: string }
-    | { mode: 'create' }
+    | { mode: 'create'; directory: string }
     | null
   >(null);
   const [revisionDialog, setRevisionDialog] = useState<
@@ -519,11 +515,60 @@ export default function App() {
     | { windowId: string; title: string }
     | null
   >(null);
+  const [persistedApps, setPersistedApps] = useState<PersistedAppDescriptor[]>([]);
+
+  const upsertPersistedApp = useCallback((descriptor: PersistedAppDescriptor) => {
+    setPersistedApps((current) => {
+      const index = current.findIndex((entry) => entry.appId === descriptor.appId);
+      if (index === -1) {
+        const next = [...current, descriptor];
+        next.sort((left, right) => left.title.localeCompare(right.title, 'en-US'));
+        return next;
+      }
+      const next = [...current];
+      next[index] = descriptor;
+      next.sort((left, right) => left.title.localeCompare(right.title, 'en-US'));
+      return next;
+    });
+  }, []);
+
+  const { persistedAppDefinitionById, desktopPersistedAppDefinitions } = useMemo(() => {
+    const byId = new Map<string, AppDefinition>();
+    const desktop: AppDefinition[] = [];
+    for (const descriptor of persistedApps) {
+      const definition: AppDefinition = {
+        appId: descriptor.appId,
+        title: descriptor.title,
+        icon: descriptor.icon,
+        hint:
+          descriptor.directory === '/'
+            ? 'Saved app'
+            : `Saved app in ${descriptor.directory}`,
+        kind: 'llm'
+      };
+      byId.set(descriptor.appId, definition);
+      desktop.push(definition);
+    }
+    desktop.sort((left, right) => left.title.localeCompare(right.title, 'en-US'));
+    return { persistedAppDefinitionById: byId, desktopPersistedAppDefinitions: desktop };
+  }, [persistedApps]);
+
+  const refreshPersistedApps = useCallback(async () => {
+    try {
+      const { apps } = await listPersistedApps();
+      setPersistedApps(apps);
+    } catch (error) {
+      console.warn('[aionios] unable to load persisted apps', error);
+    }
+  }, []);
 
   useEffect(() => {
-    filesRef.current = state.files;
+    void refreshPersistedApps();
+  }, [refreshPersistedApps]);
+
+  useEffect(() => {
     sessionRef.current = state.sessionId;
-  }, [state.files, state.sessionId]);
+  }, [state.sessionId]);
 
   useEffect(() => {
     if (!revisionDialog) {
@@ -641,12 +686,17 @@ export default function App() {
     };
   }, []);
 
+  const resolveAppDefinition = useCallback(
+    (appId: string) => persistedAppDefinitionById.get(appId) ?? getAppDefinition(appId),
+    [persistedAppDefinitionById]
+  );
+
   const openApp = useCallback(
     async (appId: string, instruction?: string) => {
       if (!state.sessionId) {
         return;
       }
-      const definition = getAppDefinition(appId);
+      const definition = resolveAppDefinition(appId);
       const title = definition?.title ?? `App ${appId}`;
       const windowId = randomWindowId();
       const isSystemApp = definition?.kind === 'system';
@@ -734,27 +784,41 @@ export default function App() {
         });
       }
     },
-    [getWindowCanvasDimensions, state.sessionId]
+    [getWindowCanvasDimensions, resolveAppDefinition, state.sessionId]
   );
 
-  const createNewWindow = useCallback(
-    async (instruction: string) => {
+  const createNewApp = useCallback(
+    async (instruction: string, directory: string) => {
       if (!state.sessionId) {
         return;
       }
 
+      const normalizedInstruction = instruction.trim() ? instruction.trim() : undefined;
       const windowId = randomWindowId();
-      const appId = 'custom';
       const title = deriveWindowTitleFromInstruction(instruction);
       const canvas = getWindowCanvasDimensions();
-      const normalizedInstruction = instruction.trim() ? instruction.trim() : undefined;
+
+      let descriptor: PersistedAppDescriptor | null = null;
+      try {
+        descriptor = await createPersistedApp({
+          directory,
+          title
+        });
+        upsertPersistedApp(descriptor);
+        await refreshPersistedApps();
+      } catch (error) {
+        console.warn('[aionios] unable to persist Create New app, falling back to ephemeral window', error);
+      }
+
+      const appId = descriptor?.appId ?? 'custom';
+      const resolvedTitle = descriptor?.title ?? title;
 
       dispatch({
         type: 'window-open-local',
         windowId,
         sessionId: state.sessionId,
         appId,
-        title,
+        title: resolvedTitle,
         canvas
       });
 
@@ -763,7 +827,7 @@ export default function App() {
           sessionId: state.sessionId,
           windowId,
           appId,
-          title,
+          title: resolvedTitle,
           instruction: normalizedInstruction
         });
         dispatch({
@@ -797,7 +861,7 @@ export default function App() {
         });
       }
     },
-    [getWindowCanvasDimensions, state.sessionId]
+    [getWindowCanvasDimensions, refreshPersistedApps, state.sessionId, upsertPersistedApp]
   );
 
   const requestUpdateForWindow = useCallback(
@@ -847,27 +911,42 @@ export default function App() {
     [state.windows]
   );
 
+  const desktopApps = useMemo(
+    () => [...APP_CATALOG, ...desktopPersistedAppDefinitions],
+    [desktopPersistedAppDefinitions]
+  );
+
   const closeContextMenu = useCallback(() => {
     setContextMenu(null);
   }, []);
 
   const contextMenuItems = useMemo(
     () => {
-      if (!contextMenu || contextMenu.kind === 'desktop') {
+      if (!contextMenu || contextMenu.kind === 'desktop' || contextMenu.kind === 'directory') {
+        const directory =
+          contextMenu?.kind === 'desktop' || contextMenu?.kind === 'directory'
+            ? contextMenu.directory
+            : '/';
         return [
-          { id: 'refresh', label: 'Refresh' },
+          {
+            id: 'refresh',
+            label: 'Refresh',
+            onSelect: () => {
+              void refreshPersistedApps();
+            }
+          },
           {
             id: 'create',
             label: 'Create New',
             onSelect: () => {
-              setPromptDialog({ mode: 'create' });
+              setPromptDialog({ mode: 'create', directory });
             }
           },
           { id: 'delete', label: 'Delete', disabled: true }
         ];
       }
 
-      const definition = getAppDefinition(contextMenu.appId);
+      const definition = resolveAppDefinition(contextMenu.appId);
       const items: ContextMenuItem[] = [
         {
           id: 'open',
@@ -878,7 +957,7 @@ export default function App() {
         }
       ];
 
-      if (definition?.kind === 'llm') {
+      if (definition?.kind === 'llm' && !contextMenu.appId.startsWith('app-')) {
         items.push({
           id: 'open-with-prompt',
           label: 'Open with prompt…',
@@ -896,7 +975,7 @@ export default function App() {
       items.push({ id: 'delete', label: 'Delete', disabled: true });
       return items;
     },
-    [contextMenu, openApp]
+    [contextMenu, openApp, refreshPersistedApps, resolveAppDefinition]
   );
 
   if (state.bootError) {
@@ -926,7 +1005,8 @@ export default function App() {
         }
         event.preventDefault();
         event.stopPropagation();
-        const icon = event.target instanceof Element ? event.target.closest('.desktop-icon[data-app-id]') : null;
+        const target = event.target instanceof Element ? event.target : null;
+        const icon = target ? target.closest('.desktop-icon[data-app-id]') : null;
         if (icon instanceof HTMLElement) {
           const appId = icon.getAttribute('data-app-id');
           if (appId) {
@@ -934,12 +1014,39 @@ export default function App() {
             return;
           }
         }
-        setContextMenu({ kind: 'desktop', x: event.clientX, y: event.clientY });
+
+        const directoryEntry = target?.closest<HTMLElement>('[data-directory-entry-path]');
+        const entryPath = directoryEntry?.getAttribute('data-directory-entry-path') ?? '';
+        if (entryPath.trim().length > 0) {
+          const directory = deriveDirectoryFromVirtualPath(entryPath);
+          setContextMenu({
+            kind: directory === '/' ? 'desktop' : 'directory',
+            x: event.clientX,
+            y: event.clientY,
+            directory
+          });
+          return;
+        }
+
+        const directoryGroup = target?.closest<HTMLElement>('[data-directory-group]');
+        const groupDirectory = directoryGroup?.getAttribute('data-directory-group') ?? '';
+        if (groupDirectory.trim().length > 0) {
+          const directory = groupDirectory.trim();
+          setContextMenu({
+            kind: directory === '/' ? 'desktop' : 'directory',
+            x: event.clientX,
+            y: event.clientY,
+            directory
+          });
+          return;
+        }
+
+        setContextMenu({ kind: 'desktop', x: event.clientX, y: event.clientY, directory: '/' });
       }}
     >
       <div className="desktop-shell__workspace">
         <div className="desktop-shell__items">
-          <DesktopIcons apps={APP_CATALOG} onOpenApp={openApp} />
+          <DesktopIcons apps={desktopApps} onOpenApp={openApp} />
         </div>
         <section ref={windowCanvasRef} className="window-canvas">
           {orderedWindows.map((windowItem) => {
@@ -954,18 +1061,14 @@ export default function App() {
               openApp: async (appId) => {
                 await openApp(appId);
               },
-              readFile: async (path) => filesRef.current[path]?.content ?? '',
+              readFile: async (path) => (await readHostFile({ path })).content,
               writeFile: async (path, content) => {
-                dispatch({
-                  type: 'file-write',
-                  path,
-                  content
-                });
+                await writeHostFile({ path, content });
               },
               requestUpdate: async (instruction) => {
                 await requestUpdateForWindow(windowItem.windowId, instruction);
               },
-              listFiles: async () => Object.values(filesRef.current),
+              listFiles: async () => (await listHostFiles()).files,
               preference: {
                 read: async () => getPreferenceConfig(),
                 update: async (input) => updatePreferenceConfig(input)
@@ -1122,7 +1225,7 @@ export default function App() {
         open={Boolean(promptDialog)}
         title={
           promptDialog?.mode === 'create'
-            ? 'Create New'
+            ? `Create New (save to ${promptDialog.directory})`
             : promptDialog?.mode === 'open'
               ? `Open “${promptDialog.title}” with a prompt`
               : promptDialog
@@ -1130,9 +1233,11 @@ export default function App() {
                 : 'Ask LLM'
         }
         description={
-          promptDialog?.mode === 'create' || promptDialog?.mode === 'open'
-            ? 'Describe what you want this new window to be.'
-            : 'Describe what you want to change in this window.'
+          promptDialog?.mode === 'create'
+            ? `Describe what you want this new app to be. It will be saved in ${promptDialog.directory}.`
+            : promptDialog?.mode === 'open'
+              ? 'Describe what you want this new window to be.'
+              : 'Describe what you want to change in this window.'
         }
         placeholder={
           promptDialog?.mode === 'open'
@@ -1156,7 +1261,7 @@ export default function App() {
             return;
           }
           if (promptDialog.mode === 'create') {
-            void createNewWindow(instruction);
+            void createNewApp(instruction, promptDialog.directory);
           } else if (promptDialog.mode === 'open') {
             void openApp(promptDialog.appId, instruction);
           } else {
