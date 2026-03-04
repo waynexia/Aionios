@@ -26,6 +26,7 @@ export interface WindowRuntimeWithHostBridgeProps {
   sessionRef: { current: string | undefined };
   dispatch: (action: AppAction) => void;
   openApp: (appId: string, instruction?: string) => Promise<void>;
+  openFile: (virtualPath: string) => Promise<void>;
   requestUpdateForWindow: (windowId: string, instruction: string) => Promise<void>;
   refreshPersistedApps: () => Promise<void>;
 }
@@ -37,6 +38,7 @@ export function WindowRuntimeWithHostBridge({
   sessionRef,
   dispatch,
   openApp,
+  openFile,
   requestUpdateForWindow,
   refreshPersistedApps
 }: WindowRuntimeWithHostBridgeProps) {
@@ -47,6 +49,9 @@ export function WindowRuntimeWithHostBridge({
       appId: windowItem.appId,
       openApp: async (appId) => {
         await openApp(appId);
+      },
+      openFile: async (path) => {
+        await openFile(path);
       },
       readFile: async (path) => (await readHostFile({ path })).content,
       writeFile: async (path, content) => {
@@ -132,6 +137,7 @@ export function WindowRuntimeWithHostBridge({
       activeSessionId,
       dispatch,
       openApp,
+      openFile,
       refreshPersistedApps,
       requestUpdateForWindow,
       sessionRef,

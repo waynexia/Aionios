@@ -15,6 +15,7 @@ describe('EDITOR_WINDOW_SOURCE', () => {
   it('includes required test hooks', () => {
     expect(EDITOR_WINDOW_SOURCE).toContain('data-editor-app');
     expect(EDITOR_WINDOW_SOURCE).toContain('data-editor-files');
+    expect(EDITOR_WINDOW_SOURCE).toContain('data-editor-selected');
     expect(EDITOR_WINDOW_SOURCE).toContain('data-editor-textarea');
     expect(EDITOR_WINDOW_SOURCE).toContain('data-editor-save');
     expect(EDITOR_WINDOW_SOURCE).toContain('data-editor-preview');

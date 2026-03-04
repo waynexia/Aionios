@@ -14,6 +14,7 @@ type WindowProps = {
   host: HostBridge;
   windowState: {
     title: string;
+    launch?: { kind: 'open-file'; path: string };
   };
 };
 
@@ -77,11 +78,16 @@ function isUrlLike(value: string) {
 }
 
 export default function WindowApp({ host, windowState }: WindowProps) {
+  const launchPath =
+    windowState.launch && windowState.launch.kind === 'open-file'
+      ? windowState.launch.path.trim()
+      : '';
   const [filePaths, setFilePaths] = useState<string[]>([]);
-  const [sourceInput, setSourceInput] = useState('');
+  const [sourceInput, setSourceInput] = useState(() => launchPath);
   const [activeSource, setActiveSource] = useState('');
   const [activeKind, setActiveKind] = useState<MediaKind | null>(null);
   const [status, setStatus] = useState('Loading host files...');
+  const [autoOpenedLaunch, setAutoOpenedLaunch] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -112,11 +118,19 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   );
 
   useEffect(() => {
-    if (sourceInput || mediaFiles.length === 0) {
+    if (sourceInput || launchPath || mediaFiles.length === 0) {
       return;
     }
     setSourceInput(mediaFiles[0]);
-  }, [mediaFiles, sourceInput]);
+  }, [launchPath, mediaFiles, sourceInput]);
+
+  useEffect(() => {
+    if (!launchPath || autoOpenedLaunch) {
+      return;
+    }
+    setAutoOpenedLaunch(true);
+    void loadSource();
+  }, [autoOpenedLaunch, launchPath]);
 
   async function loadSource() {
     const requestedSource = sourceInput.trim();
@@ -126,7 +140,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     }
 
     let resolvedSource = requestedSource;
-    if (mediaFiles.includes(requestedSource)) {
+    const shouldResolveHostFile =
+      (launchPath && requestedSource === launchPath) || mediaFiles.includes(requestedSource);
+    if (shouldResolveHostFile) {
       try {
         const content = (await host.readFile(requestedSource)).trim();
         if (content && (isUrlLike(content) || detectMediaKind(content))) {

@@ -12,6 +12,7 @@ function shouldKeepNativeContextMenu(target: EventTarget | null) {
 
 export function useDesktopContextMenu(options: {
   openApp: (appId: string) => Promise<void>;
+  openFile: (virtualPath: string) => Promise<void>;
   refreshPersistedApps: () => Promise<void>;
   trashVirtualPath: (virtualPath: string) => Promise<void>;
   resolveAppDefinition: (appId: string) => AppDefinition | undefined;
@@ -21,6 +22,7 @@ export function useDesktopContextMenu(options: {
 }) {
   const {
     openApp,
+    openFile,
     openCreateDialog,
     openOpenDialog,
     persistedAppDescriptorById,
@@ -56,6 +58,7 @@ export function useDesktopContextMenu(options: {
       buildDesktopContextMenuItems({
         contextMenu,
         openApp,
+        openFile,
         refreshPersistedApps,
         trashVirtualPath,
         resolveAppDefinition,
@@ -66,6 +69,7 @@ export function useDesktopContextMenu(options: {
     [
       contextMenu,
       openApp,
+      openFile,
       openCreateDialog,
       openOpenDialog,
       persistedAppDescriptorById,
@@ -82,4 +86,3 @@ export function useDesktopContextMenu(options: {
     onContextMenu
   };
 }
-

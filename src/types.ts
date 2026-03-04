@@ -4,6 +4,8 @@ export type UpdateStrategy = 'hmr' | 'remount';
 
 export type LlmBackend = 'mock' | 'codex';
 
+export type WindowLaunchRequest = { kind: 'open-file'; path: string };
+
 export interface PreferenceConfig {
   serverPort: number;
   serverDisableHmr: boolean;
@@ -36,6 +38,7 @@ export interface DesktopWindow {
   sessionId: string;
   appId: string;
   title: string;
+  launch?: WindowLaunchRequest;
   x: number;
   y: number;
   width: number;
@@ -77,6 +80,7 @@ export interface WindowModuleState {
   title: string;
   revision: number;
   status: ClientWindowStatus;
+  launch?: WindowLaunchRequest;
   terminal?: TerminalStateSnapshot;
 }
 
@@ -112,6 +116,7 @@ export interface HostBridge {
   windowId: string;
   appId: string;
   openApp: (appId: string) => Promise<void>;
+  openFile: (path: string) => Promise<void>;
   readFile: (path: string) => Promise<string>;
   writeFile: (path: string, content: string) => Promise<void>;
   requestUpdate: (instruction: string) => Promise<void>;

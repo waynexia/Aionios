@@ -16,6 +16,7 @@ type WindowProps = {
   host: {
     windowId: string;
     openApp: (appId: string) => Promise<void>;
+    openFile: (path: string) => Promise<void>;
     listFiles: () => Promise<Array<FileEntry | string>>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<void>;
@@ -431,7 +432,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                             void host.openApp(descriptor.appId);
                             return;
                           }
-                          selectPath(file.path);
+                          void host.openFile(file.path);
                         }}
                         onContextMenu={() => selectPath(file.path)}
                         title={file.path}

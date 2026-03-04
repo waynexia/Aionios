@@ -7,6 +7,7 @@ describe('directory system app source', () => {
     expect(DIRECTORY_WINDOW_SOURCE).toContain('host.listFiles');
     expect(DIRECTORY_WINDOW_SOURCE).toContain('host.readFile');
     expect(DIRECTORY_WINDOW_SOURCE).toContain('host.writeFile');
+    expect(DIRECTORY_WINDOW_SOURCE).toContain('host.openFile');
   });
 
   it('includes stable testing hooks', () => {

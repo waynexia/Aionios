@@ -121,6 +121,7 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
             title: windowItem.title,
             revision: windowItem.revision,
             status: windowItem.status,
+            launch: windowItem.launch,
             terminal: terminalState
           }}
         />

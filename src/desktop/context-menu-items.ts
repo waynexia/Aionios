@@ -17,6 +17,7 @@ export type DesktopContextMenuState =
 export function buildDesktopContextMenuItems(options: {
   contextMenu: DesktopContextMenuState | null;
   openApp: (appId: string) => Promise<void>;
+  openFile: (virtualPath: string) => Promise<void>;
   refreshPersistedApps: () => Promise<void>;
   trashVirtualPath: (virtualPath: string) => Promise<void>;
   resolveAppDefinition: (appId: string) => AppDefinition | undefined;
@@ -29,6 +30,7 @@ export function buildDesktopContextMenuItems(options: {
     onCreateNewApp,
     onOpenWithPrompt,
     openApp,
+    openFile,
     persistedAppDescriptorById,
     refreshPersistedApps,
     resolveAppDefinition,
@@ -135,6 +137,13 @@ export function buildDesktopContextMenuItems(options: {
   if (contextMenu.kind === 'file') {
     const filePath = contextMenu.path;
     return [
+      {
+        id: 'open',
+        label: 'Open',
+        onSelect: () => {
+          void openFile(filePath);
+        }
+      },
       {
         id: 'delete',
         label: 'Delete',

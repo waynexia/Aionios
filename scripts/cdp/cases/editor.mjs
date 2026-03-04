@@ -68,6 +68,19 @@ export default {
         Boolean(
           await ctx.evaluate(
             `(() => {
+              const selected = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"] [data-editor-selected]');
+              return selected instanceof HTMLElement && (selected.textContent ?? '').trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)};
+            })()`
+          )
+        ),
+      'Editor did not select the requested file'
+    );
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
               const textarea = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"] [data-editor-textarea]');
               return textarea instanceof HTMLTextAreaElement && textarea.value.includes('Directory CDP check');
             })()`

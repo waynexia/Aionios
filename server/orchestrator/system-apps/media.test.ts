@@ -13,6 +13,7 @@ describe('MEDIA_WINDOW_SOURCE', () => {
   it('uses host file APIs and renders media players', () => {
     expect(MEDIA_WINDOW_SOURCE).toContain('.listFiles()');
     expect(MEDIA_WINDOW_SOURCE).toContain('host.readFile');
+    expect(MEDIA_WINDOW_SOURCE).toContain('windowState.launch');
     expect(MEDIA_WINDOW_SOURCE).toContain('<img');
     expect(MEDIA_WINDOW_SOURCE).toContain('<audio');
     expect(MEDIA_WINDOW_SOURCE).toContain('<video');

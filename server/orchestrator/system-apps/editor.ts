@@ -15,6 +15,7 @@ type WindowProps = {
   };
   windowState: {
     title: string;
+    launch?: { kind: 'open-file'; path: string };
   };
 };
 
@@ -74,6 +75,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     [content, savedContent, selectedPath]
   );
 
+  const launchPath =
+    windowState.launch && windowState.launch.kind === 'open-file'
+      ? windowState.launch.path.trim()
+      : '';
+
   async function loadFile(path: string, canCommit: () => boolean = () => true) {
     if (!canCommit()) {
       return;
@@ -127,8 +133,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           return;
         }
         const firstPath = sorted[0]?.path;
-        if (firstPath) {
-          await loadFile(firstPath, () => active);
+        const initialPath = launchPath || firstPath;
+        if (initialPath) {
+          await loadFile(initialPath, () => active);
         }
       } catch (reason) {
         if (!active) {
@@ -233,6 +240,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.8 }}>
           Browse host files, edit source, and preview syntax highlighting.
         </p>
+        <span data-editor-selected style={{ display: 'none' }}>{selectedPath}</span>
       </header>
 
       <ul

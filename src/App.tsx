@@ -71,7 +71,7 @@ export default function App() {
     [persistedAppDefinitionById]
   );
 
-  const { openApp, createNewApp, requestUpdateForWindow, branchWindowFromRevision, trashVirtualPath } =
+  const { openApp, openFile, createNewApp, requestUpdateForWindow, branchWindowFromRevision, trashVirtualPath } =
     useWindowActions({
       sessionId: state.sessionId,
       dispatch,
@@ -97,6 +97,7 @@ export default function App() {
 
   const { contextMenu, contextMenuItems, closeContextMenu, onContextMenu } = useDesktopContextMenu({
     openApp,
+    openFile,
     refreshPersistedApps,
     trashVirtualPath,
     resolveAppDefinition,
@@ -216,6 +217,7 @@ export default function App() {
                   windowItem={windowItem}
                   activeSessionId={activeSessionId}
                   openApp={openApp}
+                  openFile={openFile}
                   requestUpdateForWindow={requestUpdateForWindow}
                   refreshPersistedApps={refreshPersistedApps}
                   sessionRef={sessionRef}

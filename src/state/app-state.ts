@@ -4,6 +4,7 @@ import type {
   ServerWindowEvent,
   TerminalStateSnapshot,
   UpdateStrategy,
+  WindowLaunchRequest,
   WindowBounds
 } from '../types';
 
@@ -47,6 +48,7 @@ export type AppAction =
       initialStatus?: ClientWindowStatus;
       initialRevision?: number;
       initialError?: string;
+      launch?: WindowLaunchRequest;
       canvas?: CanvasDimensions;
     }
   | {
@@ -329,6 +331,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
             sessionId: action.sessionId,
             appId: action.appId,
             title: action.title,
+            launch: action.launch ?? windowItem.launch,
             status: action.initialStatus ?? windowItem.status,
             revision: action.initialRevision ?? windowItem.revision,
             minimized: false,
@@ -344,6 +347,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         sessionId: action.sessionId,
         appId: action.appId,
         title: action.title,
+        launch: action.launch,
         x: initialBounds.x,
         y: initialBounds.y,
         width: initialBounds.width,
