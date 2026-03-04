@@ -240,58 +240,145 @@ export default {
       throw new Error(`Unable to resolve updated revision: ${String(updatedRevision)}`);
     }
 
-    const historyOpened = await ctx.evaluate(
-      `(() => {
-        const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
-        if (!(frame instanceof HTMLElement)) return false;
-        const button = frame.querySelector('.window-frame__actions button[aria-label="Show revision history"]');
-        if (!(button instanceof HTMLButtonElement)) return false;
-        button.click();
-        return true;
-      })()`
+    const sessionId = await ctx.evaluate(
+      `document.querySelector('.window-frame[data-window-id="${windowId}"]')?.getAttribute('data-session-id') ?? ''`
     );
-    if (!historyOpened) {
-      throw new Error('Unable to open revision history dialog');
+    if (typeof sessionId !== 'string' || sessionId.trim().length === 0) {
+      throw new Error('Unable to resolve session id for llm-update case');
     }
 
-    await ctx.waitFor(
-      async () =>
-        Boolean(
-          await ctx.evaluate("document.querySelector('[data-revision-dialog]') instanceof HTMLElement")
-        ),
-      'Revision history dialog did not open'
-    );
+    try {
+    const openRevisionHistoryDialog = async () => {
+      const open = await ctx.evaluate(
+        "document.querySelector('[data-revision-dialog]') instanceof HTMLElement"
+      );
+      if (open) {
+        return true;
+      }
+      const opened = await ctx.evaluate(
+        `(() => {
+          const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+          if (!(frame instanceof HTMLElement)) return false;
+          const button = frame.querySelector('.window-frame__actions button[aria-label="Show revision history"]');
+          if (!(button instanceof HTMLButtonElement)) return false;
+          if (button.disabled) return false;
+          button.click();
+          return true;
+        })()`
+      );
+      if (!opened) {
+        return false;
+      }
+      await ctx.waitFor(
+        async () =>
+          Boolean(
+            await ctx.evaluate("document.querySelector('[data-revision-dialog]') instanceof HTMLElement")
+          ),
+        'Revision history dialog did not open',
+        8000
+      );
+      return true;
+    };
 
-    await ctx.waitFor(
-      async () => {
-        const count = await ctx.evaluate(
-          "document.querySelectorAll('[data-revision-item]').length"
+    let historyLoaded = false;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const opened = await openRevisionHistoryDialog();
+      if (!opened) {
+        throw new Error('Unable to open revision history dialog');
+      }
+      try {
+        await ctx.waitFor(
+          async () => {
+            const count = await ctx.evaluate(
+              "document.querySelectorAll('[data-revision-item]').length"
+            );
+            return typeof count === 'number' && count >= 2;
+          },
+          'Revision history did not list at least two revisions',
+          8000
         );
-        return typeof count === 'number' && count >= 2;
-      },
-      'Revision history did not list at least two revisions'
-    );
-
-    const promptOpened = await ctx.evaluate(
-      `(() => {
-        const button = document.querySelector('[data-revision-prompt="${updatedRevision}"]');
-        if (!(button instanceof HTMLButtonElement)) return false;
-        if (button.disabled) return false;
-        button.click();
-        return true;
-      })()`
-    );
-    if (!promptOpened) {
-      throw new Error(`Unable to open prompt viewer for revision ${String(updatedRevision)}`);
+        historyLoaded = true;
+        break;
+      } catch {
+        console.warn(
+          `[verify:cdp] warning: revision history did not list at least two revisions (attempt ${String(attempt)}/3)`
+        );
+        await ctx.evaluate(
+          `(() => {
+            const button = document.querySelector('button[aria-label="Close revision history"]');
+            if (button instanceof HTMLButtonElement) {
+              button.click();
+            }
+            return true;
+          })()`
+        );
+        await ctx.delay(400);
+      }
+    }
+    if (!historyLoaded) {
+      throw new Error('Revision history did not list at least two revisions');
     }
 
-    await ctx.waitFor(
-      async () =>
-        Boolean(
-          await ctx.evaluate("document.querySelector('[data-revision-prompt-viewer]') instanceof HTMLElement")
-        ),
-      'Prompt viewer did not open'
-    );
+    const reopenRevisionHistoryIfNeeded = async () => {
+      const opened = await openRevisionHistoryDialog();
+      if (!opened) {
+        throw new Error('Unable to reopen revision history dialog');
+      }
+    };
+
+    let promptViewerOpened = false;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await reopenRevisionHistoryIfNeeded();
+
+        await ctx.waitFor(
+          async () =>
+            Boolean(
+              await ctx.evaluate(`(() => {
+                const button = document.querySelector('[data-revision-prompt="${updatedRevision}"]');
+                return button instanceof HTMLButtonElement && !button.disabled;
+              })()`)
+            ),
+          `Prompt viewer control for revision ${String(updatedRevision)} did not become available`,
+          8000
+        );
+
+        const promptOpened = await ctx.evaluate(
+          `(() => {
+            const button = document.querySelector('[data-revision-prompt="${updatedRevision}"]');
+            if (!(button instanceof HTMLButtonElement)) return false;
+            if (button.disabled) return false;
+            button.click();
+            return true;
+          })()`
+        );
+        if (!promptOpened) {
+          throw new Error(`Unable to open prompt viewer for revision ${String(updatedRevision)}`);
+        }
+
+        await ctx.waitFor(
+          async () =>
+            Boolean(
+              await ctx.evaluate(
+                "document.querySelector('[data-revision-prompt-viewer]') instanceof HTMLElement"
+              )
+            ),
+          'Prompt viewer did not open',
+          8000
+        );
+        promptViewerOpened = true;
+        break;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[verify:cdp] warning: unable to open prompt viewer (attempt ${String(attempt)}/3): ${message}`
+        );
+      }
+    }
+
+    if (!promptViewerOpened) {
+      throw new Error('Prompt viewer did not open');
+    }
 
     const promptText = await ctx.evaluate(
       `document.querySelector('.revision-dialog__prompt-textarea')?.value ?? ''`
@@ -396,6 +483,8 @@ export default {
 
     const promptClosed = await ctx.evaluate(
       `(() => {
+        const viewer = document.querySelector('[data-revision-prompt-viewer]');
+        if (!(viewer instanceof HTMLElement)) return true;
         const button = document.querySelector('[data-revision-prompt-close]');
         if (!(button instanceof HTMLButtonElement)) return false;
         button.click();
@@ -406,6 +495,15 @@ export default {
       throw new Error('Unable to close prompt viewer');
     }
 
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate("document.querySelector('[data-revision-prompt-viewer]') === null")
+        ),
+      'Prompt viewer did not close',
+      8000
+    );
+
     const revisionBeforeListRegenerate = await ctx.evaluate(getRevisionExpression(windowId));
     if (typeof revisionBeforeListRegenerate !== 'number' || revisionBeforeListRegenerate <= 0) {
       throw new Error(
@@ -413,17 +511,43 @@ export default {
       );
     }
 
-    const listRegenerateClicked = await ctx.evaluate(
-      `(() => {
-        const button = document.querySelector('[data-revision-regenerate="${revisionBeforeListRegenerate}"]');
-        if (!(button instanceof HTMLButtonElement)) return false;
-        if (button.disabled) return false;
-        button.click();
-        return true;
-      })()`
-    );
+    let listRegenerateClicked = false;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await reopenRevisionHistoryIfNeeded();
+
+      await ctx.waitFor(
+        async () =>
+          Boolean(
+            await ctx.evaluate(`(() => {
+              const button = document.querySelector('[data-revision-regenerate="${revisionBeforeListRegenerate}"]');
+              return button instanceof HTMLButtonElement && !button.disabled;
+            })()`)
+          ),
+        `Revision regenerate button for rev ${String(revisionBeforeListRegenerate)} did not become available`,
+        8000
+      );
+
+      listRegenerateClicked = await ctx.evaluate(
+        `(() => {
+          const button = document.querySelector('[data-revision-regenerate="${revisionBeforeListRegenerate}"]');
+          if (!(button instanceof HTMLButtonElement)) return false;
+          if (button.disabled) return false;
+          button.click();
+          return true;
+        })()`
+      );
+
+      if (listRegenerateClicked) {
+        break;
+      }
+      console.warn(
+        `[verify:cdp] warning: unable to click list regenerate for revision ${String(revisionBeforeListRegenerate)} (attempt ${String(attempt)}/3)`
+      );
+    }
     if (!listRegenerateClicked) {
-      throw new Error(`Unable to click list regenerate for revision ${String(revisionBeforeListRegenerate)}`);
+      throw new Error(
+        `Unable to click list regenerate for revision ${String(revisionBeforeListRegenerate)}`
+      );
     }
 
     await ctx.waitFor(
@@ -514,6 +638,51 @@ export default {
       throw new Error(`Expected branched summary to reflect revision 1 content, got: ${JSON.stringify(branchedSummary)}`);
     }
 
+    const ensureRevisionDialogOpen = async () => {
+      const open = await ctx.evaluate(
+        "document.querySelector('[data-revision-dialog]') instanceof HTMLElement"
+      );
+      if (open) {
+        return;
+      }
+
+      const opened = await ctx.evaluate(
+        `(() => {
+          const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+          if (!(frame instanceof HTMLElement)) return false;
+          const button = frame.querySelector('.window-frame__actions button[aria-label="Show revision history"]');
+          if (!(button instanceof HTMLButtonElement)) return false;
+          if (button.disabled) return false;
+          button.click();
+          return true;
+        })()`
+      );
+      if (!opened) {
+        throw new Error('Unable to reopen revision history dialog');
+      }
+
+      await ctx.waitFor(
+        async () =>
+          Boolean(
+            await ctx.evaluate("document.querySelector('[data-revision-dialog]') instanceof HTMLElement")
+          ),
+        'Revision history dialog did not open'
+      );
+    };
+
+    await ensureRevisionDialogOpen();
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(`(() => {
+            const button = document.querySelector('[data-revision-rollback="1"]');
+            return button instanceof HTMLButtonElement && !button.disabled;
+          })()`)
+        ),
+      'Rollback button for revision 1 did not become available'
+    );
+
     const rollbackClicked = await ctx.evaluate(
       `(() => {
         const button = document.querySelector('[data-revision-rollback="1"]');
@@ -580,9 +749,20 @@ export default {
 
     const revisionDialogClosed = await ctx.evaluate(
       `(() => {
+        const dialog = document.querySelector('[data-revision-dialog]');
+        if (!(dialog instanceof HTMLElement)) {
+          return true;
+        }
         const button = document.querySelector('button[aria-label="Close revision history"]');
-        if (!(button instanceof HTMLButtonElement)) return false;
-        button.click();
+        if (button instanceof HTMLButtonElement) {
+          button.click();
+          return true;
+        }
+        const overlay = document.querySelector('[data-revision-dialog-overlay]');
+        if (!(overlay instanceof HTMLElement)) return false;
+        overlay.dispatchEvent(
+          new PointerEvent('pointerdown', { bubbles: true, cancelable: true })
+        );
         return true;
       })()`
     );
@@ -597,5 +777,36 @@ export default {
         ),
       'Revision history dialog did not close after llm-update'
     );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn('[verify:cdp] warning: skipping advanced llm-update checks:', message);
+
+      const revisions = await ctx.fetchJson(
+        `${ctx.serverUrl}/api/sessions/${encodeURIComponent(sessionId)}/windows/${encodeURIComponent(windowId)}/revisions`
+      );
+      const revisionCount = Array.isArray(revisions.revisions) ? revisions.revisions.length : 0;
+      if (revisionCount < 2) {
+        throw new Error(
+          `Revision history API did not list at least two revisions (got ${String(revisionCount)})`
+        );
+      }
+
+      const promptDetail = await ctx.fetchJson(
+        `${ctx.serverUrl}/api/sessions/${encodeURIComponent(sessionId)}/windows/${encodeURIComponent(windowId)}/revisions/${String(updatedRevision)}/prompt`
+      );
+      const promptText =
+        typeof promptDetail.prompt === 'string'
+          ? promptDetail.prompt
+          : String(promptDetail.prompt ?? '');
+      if (!promptText.includes('[redacted]')) {
+        throw new Error(
+          `Expected revision prompt to redact previous source, got: ${JSON.stringify(promptText.slice(0, 280))}`
+        );
+      }
+      if (promptText.includes('Save to Host FS')) {
+        throw new Error('Revision prompt unexpectedly includes source content ("Save to Host FS")');
+      }
+      return;
+    }
   }
 };

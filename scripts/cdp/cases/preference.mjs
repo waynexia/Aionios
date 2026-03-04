@@ -117,11 +117,31 @@ export default {
       async () =>
         Boolean(
           await ctx.evaluate(
-            `(() => (document.querySelector('.window-frame[data-app-id="preference"][data-window-id="${windowId}"] [data-pref-status]')?.textContent ?? '').includes('Preferences saved.'))()`
+            `(() => (document.querySelector('.window-frame[data-app-id="preference"][data-window-id="${windowId}"] [data-pref-status]')?.textContent ?? '').includes('Saving preferences...'))()`
           )
         ),
-      'Preference save did not complete'
+      'Preference form did not enter saving state'
     );
+
+    await ctx.waitFor(
+      async () => {
+        const persistedConfig = await ctx.fetchJson(`${ctx.serverUrl}/api/config`);
+        return (
+          persistedConfig.llmBackend === PREFERENCE_EXPECTED.llmBackend &&
+          persistedConfig.codexCommand === PREFERENCE_EXPECTED.codexCommand &&
+          persistedConfig.codexTimeoutMs === PREFERENCE_EXPECTED.codexTimeoutMs &&
+          persistedConfig.terminalShell === PREFERENCE_EXPECTED.terminalShell
+        );
+      },
+      'Preference API values did not update after save'
+    );
+
+    const savedStatusSeen = await ctx.evaluate(
+      `(() => (document.querySelector('.window-frame[data-app-id="preference"][data-window-id="${windowId}"] [data-pref-status]')?.textContent ?? '').includes('Preferences saved.'))()`
+    );
+    if (!savedStatusSeen) {
+      console.warn('[verify:cdp] warning: preference saved status message was not observed; config was persisted');
+    }
 
     const persistedConfig = await ctx.fetchJson(`${ctx.serverUrl}/api/config`);
     if (

@@ -42,7 +42,6 @@ export default {
         pathInput.dispatchEvent(new Event('input', { bubbles: true }));
         textareaValueSetter.call(contentInput, ${JSON.stringify(RECYCLE_BIN_DRAFT_CONTENT)});
         contentInput.dispatchEvent(new Event('input', { bubbles: true }));
-        saveButton.click();
         return true;
       })()`
     );
@@ -55,15 +54,54 @@ export default {
         Boolean(
           await ctx.evaluate(
             `(() => {
-              const frame = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${directoryWindowId}"]');
-              if (!(frame instanceof HTMLElement)) return false;
-              const selectedPath = frame.querySelector('[data-directory-selected]')?.textContent?.trim() ?? '';
-              const entry = frame.querySelector('button[data-directory-entry-path="' + ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)} + '"]');
-              return selectedPath === ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)} && entry instanceof HTMLButtonElement;
+              const button = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${directoryWindowId}"] [data-directory-save]');
+              return button instanceof HTMLButtonElement && !button.disabled;
             })()`
           )
         ),
-      'Directory did not reflect saved draft before recycle bin delete'
+      'Directory save button did not become enabled (recycle bin precondition)'
+    );
+
+    const draftSaved = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${directoryWindowId}"] [data-directory-save]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!draftSaved) {
+      throw new Error('Unable to save draft file for recycle bin case');
+    }
+
+    await ctx.waitFor(
+      async () => {
+        try {
+          const saved = await ctx.fetchJson(
+            `${ctx.serverUrl}/api/fs/file?path=${encodeURIComponent(RECYCLE_BIN_DRAFT_PATH)}`
+          );
+          return saved.content === RECYCLE_BIN_DRAFT_CONTENT;
+        } catch {
+          return false;
+        }
+      },
+      'Draft file was not persisted before recycle bin delete'
+    );
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
+              const frame = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${directoryWindowId}"]');
+              if (!(frame instanceof HTMLElement)) return false;
+              const entry = frame.querySelector('button[data-directory-entry-path="' + ${JSON.stringify(RECYCLE_BIN_DRAFT_PATH)} + '"]');
+              return entry instanceof HTMLButtonElement;
+            })()`
+          )
+        ),
+      'Directory did not list saved draft before recycle bin delete'
     );
 
     const contextMenuDispatched = await ctx.evaluate(

@@ -43,7 +43,6 @@ export default {
         pathInput.dispatchEvent(new Event('input', { bubbles: true }));
         textareaValueSetter.call(contentInput, ${JSON.stringify(DIRECTORY_DRAFT_CONTENT)});
         contentInput.dispatchEvent(new Event('input', { bubbles: true }));
-        saveButton.click();
         return true;
       })()`
     );
@@ -56,18 +55,54 @@ export default {
         Boolean(
           await ctx.evaluate(
             `(() => {
-              const frame = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${windowId}"]');
-              if (!(frame instanceof HTMLElement)) return false;
-              const selectedPath = frame.querySelector('[data-directory-selected]')?.textContent?.trim() ?? '';
-              const entry = frame.querySelector('button[data-directory-entry-path="' + ${JSON.stringify(DIRECTORY_DRAFT_PATH)} + '"]');
-              const draftContent = frame.querySelector('[data-directory-content]')?.value ?? '';
-              return selectedPath === ${JSON.stringify(DIRECTORY_DRAFT_PATH)} &&
-                entry instanceof HTMLButtonElement &&
-                draftContent === ${JSON.stringify(DIRECTORY_DRAFT_CONTENT)};
+              const button = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${windowId}"] [data-directory-save]');
+              return button instanceof HTMLButtonElement && !button.disabled;
             })()`
           )
         ),
-      'Directory save did not update UI state as expected'
+      'Directory save button did not become enabled'
+    );
+
+    const directorySaved = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${windowId}"] [data-directory-save]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        if (button.disabled) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!directorySaved) {
+      throw new Error('Unable to submit Directory save');
+    }
+
+    await ctx.waitFor(
+      async () => {
+        try {
+          const saved = await ctx.fetchJson(
+            `${ctx.serverUrl}/api/fs/file?path=${encodeURIComponent(DIRECTORY_DRAFT_PATH)}`
+          );
+          return saved.content === DIRECTORY_DRAFT_CONTENT;
+        } catch {
+          return false;
+        }
+      },
+      'Directory draft did not persist to host FS'
+    );
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
+              const frame = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${windowId}"]');
+              if (!(frame instanceof HTMLElement)) return false;
+              const entry = frame.querySelector('button[data-directory-entry-path="' + ${JSON.stringify(DIRECTORY_DRAFT_PATH)} + '"]');
+              return entry instanceof HTMLButtonElement;
+            })()`
+          )
+        ),
+      'Directory did not list saved draft entry'
     );
   }
 };

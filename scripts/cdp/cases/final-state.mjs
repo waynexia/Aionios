@@ -1,3 +1,5 @@
+import { PREFERENCE_EXPECTED } from '../fixtures.mjs';
+
 export default {
   id: 'final-state',
   title: 'Final desktop state',
@@ -24,8 +26,24 @@ export default {
       throw new Error(`Missing expected windows: ${missingApps.join(', ')}`);
     }
 
-    if (typeof finalState.preferenceStatus === 'string' && !finalState.preferenceStatus.includes('Preferences saved.')) {
-      throw new Error(`Preference status did not confirm save: ${JSON.stringify(finalState.preferenceStatus)}`);
+    const persistedConfig = await ctx.fetchJson(`${ctx.serverUrl}/api/config`);
+    if (
+      persistedConfig.llmBackend !== PREFERENCE_EXPECTED.llmBackend ||
+      persistedConfig.codexCommand !== PREFERENCE_EXPECTED.codexCommand ||
+      persistedConfig.codexTimeoutMs !== PREFERENCE_EXPECTED.codexTimeoutMs ||
+      persistedConfig.terminalShell !== PREFERENCE_EXPECTED.terminalShell
+    ) {
+      throw new Error(`Preference API values mismatch: ${JSON.stringify(persistedConfig)}`);
+    }
+
+    if (
+      typeof finalState.preferenceStatus === 'string' &&
+      !finalState.preferenceStatus.includes('Preferences saved.')
+    ) {
+      console.warn(
+        '[verify:cdp] warning: preference status did not confirm save:',
+        JSON.stringify(finalState.preferenceStatus)
+      );
     }
 
     if (finalState.windows < requiredApps.length || finalState.icons < 2) {

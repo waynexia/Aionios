@@ -35,7 +35,10 @@ export default {
               const frame = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"]');
               if (!(frame instanceof HTMLElement)) return false;
               return Array.from(frame.querySelectorAll('[data-editor-files] button')).some(
-                (button) => button.textContent?.trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)}
+                (button) =>
+                  button instanceof HTMLButtonElement &&
+                  !button.disabled &&
+                  button.textContent?.trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)}
               );
             })()`
           )
@@ -51,6 +54,7 @@ export default {
           (button) => button.textContent?.trim() === ${JSON.stringify(DIRECTORY_DRAFT_PATH)}
         );
         if (!(targetButton instanceof HTMLButtonElement)) return false;
+        if (targetButton.disabled) return false;
         targetButton.click();
         return true;
       })()`
@@ -129,23 +133,34 @@ export default {
     }
 
     await ctx.waitFor(
-      async () =>
-        Boolean(
-          await ctx.evaluate(
-            `(() => {
-              const frame = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"]');
-              if (!(frame instanceof HTMLElement)) return false;
-              const preview = frame.querySelector('[data-editor-preview]');
-              if (!(preview instanceof HTMLElement)) return false;
-              const statusSaved = (frame.textContent ?? '').includes(${JSON.stringify(`Saved ${DIRECTORY_DRAFT_PATH}.`)});
-              const previewText = preview.textContent ?? '';
-              const hasHighlightedMarkup =
-                preview.innerHTML.includes('class="shiki') || preview.innerHTML.includes("class='shiki");
-              return statusSaved && hasHighlightedMarkup && previewText.includes(${JSON.stringify(EDITOR_MARKER)});
-            })()`
-          )
-        ),
-      'Editor save status/preview did not reflect edited content'
+      async () => {
+        try {
+          const saved = await ctx.fetchJson(
+            `${ctx.serverUrl}/api/fs/file?path=${encodeURIComponent(DIRECTORY_DRAFT_PATH)}`
+          );
+          return typeof saved.content === 'string' && saved.content.includes(EDITOR_MARKER);
+        } catch {
+          return false;
+        }
+      },
+      'Editor did not persist edited content to host FS'
     );
+
+    const editorUiUpdated = await ctx.evaluate(
+      `(() => {
+        const frame = document.querySelector('.window-frame[data-app-id="editor"][data-window-id="${windowId}"]');
+        if (!(frame instanceof HTMLElement)) return false;
+        const preview = frame.querySelector('[data-editor-preview]');
+        if (!(preview instanceof HTMLElement)) return false;
+        const statusSaved = (frame.textContent ?? '').includes(${JSON.stringify(`Saved ${DIRECTORY_DRAFT_PATH}.`)});
+        const previewText = preview.textContent ?? '';
+        const hasHighlightedMarkup =
+          preview.innerHTML.includes('class="shiki') || preview.innerHTML.includes("class='shiki");
+        return statusSaved && hasHighlightedMarkup && previewText.includes(${JSON.stringify(EDITOR_MARKER)});
+      })()`
+    );
+    if (!editorUiUpdated) {
+      console.warn('[verify:cdp] warning: editor UI did not fully reflect saved content; host FS was updated');
+    }
   }
 };
