@@ -146,6 +146,31 @@ export class WindowOrchestrator {
 
   subscribe(sessionId: string, response: Parameters<SessionEventBus['subscribe']>[1]) {
     this.eventBus.subscribe(sessionId, response);
+
+    const snapshots = this.listWindows(sessionId);
+    for (const snapshot of snapshots) {
+      const record = this.store.getWindow(sessionId, snapshot.windowId);
+      const strategy = record?.revisions.at(-1)?.strategy;
+      const event: SessionEvent = {
+        type:
+          snapshot.status === 'ready'
+            ? 'window-ready'
+            : snapshot.status === 'error'
+              ? 'window-error'
+              : 'window-status',
+        sessionId,
+        windowId: snapshot.windowId,
+        appId: snapshot.appId,
+        title: snapshot.title,
+        status: snapshot.status,
+        revision: snapshot.revision,
+        strategy,
+        error: snapshot.error
+      };
+
+      response.write(`event: ${event.type}\n`);
+      response.write(`data: ${JSON.stringify(event)}\n\n`);
+    }
   }
 
   attachModuleBridge(moduleBridge: ModuleUpdateBridge) {
