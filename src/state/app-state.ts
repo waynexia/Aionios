@@ -317,7 +317,27 @@ export function reducer(state: AppState, action: AppAction): AppState {
         bootError: action.message
       };
     case 'window-open-local': {
+      const existing = state.windows.find((windowItem) => windowItem.windowId === action.windowId);
       const nextZ = state.nextZIndex + 1;
+      if (existing) {
+        return {
+          ...state,
+          focusedWindowId: action.windowId,
+          nextZIndex: nextZ,
+          windows: updateWindow(state.windows, action.windowId, (windowItem) => ({
+            ...windowItem,
+            sessionId: action.sessionId,
+            appId: action.appId,
+            title: action.title,
+            status: action.initialStatus ?? windowItem.status,
+            revision: action.initialRevision ?? windowItem.revision,
+            minimized: false,
+            zIndex: nextZ,
+            error: action.initialError ?? windowItem.error
+          }))
+        };
+      }
+
       const initialBounds = createInitialWindowBounds(state.windows, action.canvas);
       const nextWindow: DesktopWindow = {
         windowId: action.windowId,
@@ -425,4 +445,3 @@ export function reducer(state: AppState, action: AppAction): AppState {
       return state;
   }
 }
-

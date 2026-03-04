@@ -70,6 +70,10 @@ export async function openWindow(input: {
   });
 }
 
+export async function listSessionWindows(input: { sessionId: string }) {
+  return requestJson<{ windows: ServerWindowSnapshot[] }>(`/api/sessions/${input.sessionId}/windows`);
+}
+
 export async function requestWindowUpdate(input: {
   sessionId: string;
   windowId: string;
