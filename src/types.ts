@@ -107,6 +107,18 @@ export interface ServerWindowSnapshot {
   error?: string;
 }
 
+export interface WindowRevisionSummary {
+  revision: number;
+  generatedAt: string;
+  backend: string;
+  strategy: UpdateStrategy;
+}
+
+export interface WindowRevisionDetail extends WindowRevisionSummary {
+  prompt: string;
+  source: string;
+}
+
 export type ServerEventType =
   | 'window-status'
   | 'window-ready'

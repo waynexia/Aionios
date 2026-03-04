@@ -42,6 +42,23 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+async function waitForRevision(
+  orchestrator: WindowOrchestrator,
+  sessionId: string,
+  windowId: string,
+  expectedRevision: number
+) {
+  const started = Date.now();
+  while (Date.now() - started < 1000) {
+    const snapshot = orchestrator.getWindowSnapshot(sessionId, windowId);
+    if (snapshot.status === 'ready' && snapshot.revision === expectedRevision) {
+      return snapshot;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  throw new Error(`Timed out waiting for revision ${expectedRevision}`);
+}
+
 describe('WindowOrchestrator', () => {
   beforeEach(() => {
     generateMock.mockReset();
@@ -160,5 +177,60 @@ describe('WindowOrchestrator', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(orchestrator.listWindows(sessionId)).toEqual([]);
+  });
+
+  it('lists revision history and returns revision details', async () => {
+    const orchestrator = createOrchestrator();
+    const sessionId = orchestrator.createSession();
+    const windowId = 'window-llm-notes';
+    const initialDeferred = createDeferred<{ source: string; backend: string }>();
+    const updateDeferred = createDeferred<{ source: string; backend: string }>();
+
+    generateMock
+      .mockReturnValueOnce(initialDeferred.promise)
+      .mockReturnValueOnce(updateDeferred.promise);
+
+    orchestrator.openWindow({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      instruction: 'Initial instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    initialDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 1);
+
+    orchestrator.requestUpdate({
+      sessionId,
+      windowId,
+      instruction: 'Update instruction'
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    updateDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 2);
+
+    const revisions = orchestrator.listWindowRevisions(sessionId, windowId);
+    expect(revisions).toHaveLength(2);
+    expect(revisions[0]?.revision).toBe(2);
+    expect(revisions[0]?.strategy).toBe('hmr');
+    expect(revisions[1]?.revision).toBe(1);
+    expect(revisions[1]?.strategy).toBe('remount');
+
+    const revisionOne = orchestrator.getWindowRevision(sessionId, windowId, 1);
+    expect(revisionOne.revision).toBe(1);
+    expect(revisionOne.backend).toBe('mock');
+    expect(revisionOne.prompt).toContain('Initial instruction');
+
+    const revisionTwo = orchestrator.getWindowRevision(sessionId, windowId, 2);
+    expect(revisionTwo.revision).toBe(2);
+    expect(revisionTwo.prompt).toContain('Update instruction');
   });
 });

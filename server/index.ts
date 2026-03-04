@@ -87,6 +87,37 @@ async function startServer() {
     }
   });
 
+  app.get('/api/sessions/:sessionId/windows/:windowId/revisions', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    try {
+      response.status(200).json({
+        revisions: orchestrator.listWindowRevisions(sessionId, windowId)
+      });
+    } catch (error) {
+      response.status(404).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
+  app.get('/api/sessions/:sessionId/windows/:windowId/revisions/:revision', (request, response) => {
+    const { sessionId, windowId } = request.params;
+    const parsedRevision = Number.parseInt(request.params.revision, 10);
+    if (!Number.isFinite(parsedRevision) || parsedRevision <= 0) {
+      response.status(400).json({
+        message: 'revision must be a positive integer.'
+      });
+      return;
+    }
+    try {
+      response.status(200).json(orchestrator.getWindowRevision(sessionId, windowId, parsedRevision));
+    } catch (error) {
+      response.status(404).json({
+        message: (error as Error).message
+      });
+    }
+  });
+
   app.post('/api/sessions/:sessionId/windows/open', (request, response) => {
     const { sessionId } = request.params;
     const { windowId, appId, title, instruction } = request.body as {

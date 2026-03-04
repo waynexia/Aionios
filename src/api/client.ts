@@ -1,7 +1,9 @@
 import type {
   PreferenceConfig,
   PreferenceConfigUpdate,
-  ServerWindowSnapshot
+  ServerWindowSnapshot,
+  WindowRevisionDetail,
+  WindowRevisionSummary
 } from '../types';
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -82,6 +84,22 @@ export async function rollbackWindow(input: {
         revision: input.revision
       })
     }
+  );
+}
+
+export async function listWindowRevisions(input: { sessionId: string; windowId: string }) {
+  return requestJson<{ revisions: WindowRevisionSummary[] }>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/revisions`
+  );
+}
+
+export async function getWindowRevision(input: {
+  sessionId: string;
+  windowId: string;
+  revision: number;
+}) {
+  return requestJson<WindowRevisionDetail>(
+    `/api/sessions/${input.sessionId}/windows/${input.windowId}/revisions/${String(input.revision)}`
   );
 }
 

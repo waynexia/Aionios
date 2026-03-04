@@ -11,6 +11,7 @@ import type {
   OpenWindowInput,
   UpdateStrategy,
   WindowActionInput,
+  WindowRevision,
   WindowSnapshot
 } from './types';
 import { validateGeneratedSource } from './validator';
@@ -88,7 +89,34 @@ export class WindowOrchestrator {
       status: record.status,
       revision: record.revisions.at(-1)?.revision ?? 0,
       error: record.error
-    };
+      };
+  }
+
+  listWindowRevisions(sessionId: string, windowId: string) {
+    const record = this.store.getWindow(sessionId, windowId);
+    if (!record) {
+      throw new Error(`Window ${sessionId}/${windowId} not found`);
+    }
+    return [...record.revisions]
+      .sort((left, right) => right.revision - left.revision)
+      .map((revision) => ({
+        revision: revision.revision,
+        generatedAt: revision.generatedAt,
+        backend: revision.backend,
+        strategy: revision.strategy
+      }));
+  }
+
+  getWindowRevision(sessionId: string, windowId: string, targetRevision: number): WindowRevision {
+    const record = this.store.getWindow(sessionId, windowId);
+    if (!record) {
+      throw new Error(`Window ${sessionId}/${windowId} not found`);
+    }
+    const revision = record.revisions.find((entry) => entry.revision === targetRevision);
+    if (!revision) {
+      throw new Error(`Revision ${targetRevision} not found`);
+    }
+    return revision;
   }
 
   openWindow(input: OpenWindowInput): WindowSnapshot {
