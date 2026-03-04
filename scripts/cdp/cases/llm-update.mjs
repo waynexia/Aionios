@@ -577,5 +577,25 @@ export default {
     if (!rolledBackSummary.includes('Last instruction:') || !rolledBackSummary.includes('tag picker')) {
       throw new Error(`Expected rolled-back summary to return to the open prompt, got: ${JSON.stringify(rolledBackSummary)}`);
     }
+
+    const revisionDialogClosed = await ctx.evaluate(
+      `(() => {
+        const button = document.querySelector('button[aria-label="Close revision history"]');
+        if (!(button instanceof HTMLButtonElement)) return false;
+        button.click();
+        return true;
+      })()`
+    );
+    if (!revisionDialogClosed) {
+      throw new Error('Unable to close revision history dialog at end of llm-update case');
+    }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate("document.querySelector('[data-revision-dialog]') === null")
+        ),
+      'Revision history dialog did not close after llm-update'
+    );
   }
 };

@@ -8,6 +8,9 @@ export const PREFERENCE_EXPECTED = {
 export const DIRECTORY_DRAFT_PATH = 'notes/cdp-system-app-check.md';
 export const DIRECTORY_DRAFT_CONTENT = '# Directory CDP check\nCreated by verify:cdp.';
 
+export const RECYCLE_BIN_DRAFT_PATH = 'notes/cdp-recycle-bin-check.txt';
+export const RECYCLE_BIN_DRAFT_CONTENT = 'CDP recycle bin check payload.';
+
 export const MEDIA_SOURCE_DATA_URL =
   'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=';
 

@@ -3,6 +3,7 @@ import type {
   PersistedAppDescriptor,
   PreferenceConfig,
   PreferenceConfigUpdate,
+  RecycleBinItem,
   ServerWindowSnapshot,
   WindowRevisionDetail,
   WindowRevisionPromptDetail,
@@ -232,6 +233,37 @@ export async function writeHostFile(input: { path: string; content: string }) {
       path: input.path,
       content: input.content
     })
+  });
+}
+
+export async function listRecycleBinItems() {
+  return requestJson<{ items: RecycleBinItem[] }>('/api/recycle-bin/items');
+}
+
+export async function trashHostFile(input: { path: string }) {
+  return requestJson<RecycleBinItem>('/api/recycle-bin/trash', {
+    method: 'POST',
+    body: JSON.stringify({
+      path: input.path
+    })
+  });
+}
+
+export async function restoreRecycleBinItem(input: { id: string }) {
+  return requestJson<{ restoredPath: string }>(`/api/recycle-bin/items/${encodeURIComponent(input.id)}/restore`, {
+    method: 'POST'
+  });
+}
+
+export async function deleteRecycleBinItem(input: { id: string }) {
+  return requestJson<{ deleted: true }>(`/api/recycle-bin/items/${encodeURIComponent(input.id)}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function emptyRecycleBin() {
+  return requestJson<{ emptied: number }>('/api/recycle-bin/empty', {
+    method: 'POST'
   });
 }
 

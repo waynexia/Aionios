@@ -9,6 +9,7 @@ import llmUpdate from './llm-update.mjs';
 import media from './media.mjs';
 import persistedApp from './persisted-app.mjs';
 import preference from './preference.mjs';
+import recycleBin from './recycle-bin.mjs';
 import taskbarClock from './taskbar-clock.mjs';
 import terminal from './terminal.mjs';
 
@@ -23,6 +24,7 @@ export const cases = [
   terminal,
   preference,
   directory,
+  recycleBin,
   media,
   editor,
   finalState

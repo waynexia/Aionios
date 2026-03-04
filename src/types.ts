@@ -56,6 +56,13 @@ export interface HostFileEntry {
   updatedAt: string;
 }
 
+export interface RecycleBinItem {
+  id: string;
+  originalPath: string;
+  deletedAt: string;
+  sizeBytes: number;
+}
+
 export interface PersistedAppDescriptor {
   appId: string;
   title: string;
@@ -92,6 +99,14 @@ export interface PreferenceHostBridge {
   update: (input: PreferenceConfigUpdate) => Promise<PreferenceConfig>;
 }
 
+export interface RecycleBinHostBridge {
+  listItems: () => Promise<RecycleBinItem[]>;
+  trash: (path: string) => Promise<RecycleBinItem>;
+  restore: (id: string) => Promise<{ restoredPath: string }>;
+  deleteItem: (id: string) => Promise<void>;
+  empty: () => Promise<{ emptied: number }>;
+}
+
 export interface HostBridge {
   sessionId: string;
   windowId: string;
@@ -103,6 +118,7 @@ export interface HostBridge {
   listFiles: () => Promise<HostFileEntry[]>;
   preference: PreferenceHostBridge;
   terminal: TerminalHostBridge;
+  recycleBin: RecycleBinHostBridge;
 }
 
 export interface WindowModuleProps {

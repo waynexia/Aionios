@@ -4,15 +4,20 @@ import {
   closeWindow,
   createSession,
   createPersistedApp,
+  deleteRecycleBinItem,
+  emptyRecycleBin,
   getPreferenceConfig,
   listHostFiles,
   listPersistedApps,
+  listRecycleBinItems,
   openWindow,
   readHostFile,
   requestWindowUpdate,
+  restoreRecycleBinItem,
   sendTerminalInput,
   startTerminal,
   stopTerminal,
+  trashHostFile,
   updatePreferenceConfig,
   writeHostFile
 } from './api/client';
@@ -481,16 +486,6 @@ function deriveWindowTitleFromInstruction(instruction: string) {
   return `${collapsed.slice(0, maxLength - 1)}…`;
 }
 
-function deriveDirectoryFromVirtualPath(virtualPath: string) {
-  const trimmed = virtualPath.replaceAll('\\', '/').trim().replace(/^\/+/, '');
-  const index = trimmed.lastIndexOf('/');
-  if (index === -1) {
-    return '/';
-  }
-  const directory = trimmed.slice(0, index);
-  return directory.length > 0 ? directory : '/';
-}
-
 export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const sessionRef = useRef(state.sessionId);
@@ -499,6 +494,7 @@ export default function App() {
     | { kind: 'desktop'; x: number; y: number; directory: string }
     | { kind: 'directory'; x: number; y: number; directory: string }
     | { kind: 'icon'; x: number; y: number; appId: string }
+    | { kind: 'file'; x: number; y: number; path: string }
     | null
   >(null);
   const [promptDialog, setPromptDialog] = useState<
@@ -532,8 +528,9 @@ export default function App() {
     });
   }, []);
 
-  const { persistedAppDefinitionById, desktopPersistedAppDefinitions } = useMemo(() => {
+  const { persistedAppDefinitionById, persistedAppDescriptorById, desktopPersistedAppDefinitions } = useMemo(() => {
     const byId = new Map<string, AppDefinition>();
+    const descriptors = new Map<string, PersistedAppDescriptor>();
     const desktop: AppDefinition[] = [];
     for (const descriptor of persistedApps) {
       const definition: AppDefinition = {
@@ -547,10 +544,15 @@ export default function App() {
         kind: 'llm'
       };
       byId.set(descriptor.appId, definition);
+      descriptors.set(descriptor.appId, descriptor);
       desktop.push(definition);
     }
     desktop.sort((left, right) => left.title.localeCompare(right.title, 'en-US'));
-    return { persistedAppDefinitionById: byId, desktopPersistedAppDefinitions: desktop };
+    return {
+      persistedAppDefinitionById: byId,
+      persistedAppDescriptorById: descriptors,
+      desktopPersistedAppDefinitions: desktop
+    };
   }, [persistedApps]);
 
   const refreshPersistedApps = useCallback(async () => {
@@ -920,6 +922,19 @@ export default function App() {
     setContextMenu(null);
   }, []);
 
+  const trashVirtualPath = useCallback(
+    async (virtualPath: string) => {
+      const trashed = await trashHostFile({ path: virtualPath });
+      window.dispatchEvent(
+        new CustomEvent('aionios:fs-changed', { detail: { action: 'trash', path: trashed.originalPath } })
+      );
+      if (trashed.originalPath.endsWith('.aionios-app.json')) {
+        await refreshPersistedApps();
+      }
+    },
+    [refreshPersistedApps]
+  );
+
   const contextMenuItems = useMemo(
     () => {
       if (!contextMenu || contextMenu.kind === 'desktop' || contextMenu.kind === 'directory') {
@@ -943,6 +958,26 @@ export default function App() {
             }
           },
           { id: 'delete', label: 'Delete', disabled: true }
+        ];
+      }
+
+      if (contextMenu.kind === 'file') {
+        const filePath = contextMenu.path;
+        return [
+          {
+            id: 'delete',
+            label: 'Delete',
+            onSelect: () => {
+              void trashVirtualPath(filePath);
+            }
+          },
+          {
+            id: 'open-recycle-bin',
+            label: 'Open Recycle Bin',
+            onSelect: () => {
+              void openApp('recycle-bin');
+            }
+          }
         ];
       }
 
@@ -972,10 +1007,20 @@ export default function App() {
         });
       }
 
-      items.push({ id: 'delete', label: 'Delete', disabled: true });
+      const descriptor = persistedAppDescriptorById.get(contextMenu.appId);
+      items.push({
+        id: 'delete',
+        label: 'Delete',
+        disabled: !descriptor,
+        onSelect: descriptor
+          ? () => {
+              void trashVirtualPath(descriptor.path);
+            }
+          : undefined
+      });
       return items;
     },
-    [contextMenu, openApp, refreshPersistedApps, resolveAppDefinition]
+    [contextMenu, openApp, persistedAppDescriptorById, refreshPersistedApps, resolveAppDefinition, trashVirtualPath]
   );
 
   if (state.bootError) {
@@ -1018,12 +1063,11 @@ export default function App() {
         const directoryEntry = target?.closest<HTMLElement>('[data-directory-entry-path]');
         const entryPath = directoryEntry?.getAttribute('data-directory-entry-path') ?? '';
         if (entryPath.trim().length > 0) {
-          const directory = deriveDirectoryFromVirtualPath(entryPath);
           setContextMenu({
-            kind: directory === '/' ? 'desktop' : 'directory',
+            kind: 'file',
             x: event.clientX,
             y: event.clientY,
-            directory
+            path: entryPath.trim()
           });
           return;
         }
@@ -1116,6 +1160,33 @@ export default function App() {
                     windowId: windowItem.windowId
                   });
                 }
+              },
+              recycleBin: {
+                listItems: async () => (await listRecycleBinItems()).items,
+                trash: async (path) => {
+                  const trashed = await trashHostFile({ path });
+                  window.dispatchEvent(
+                    new CustomEvent('aionios:fs-changed', { detail: { action: 'trash', path: trashed.originalPath } })
+                  );
+                  if (trashed.originalPath.endsWith('.aionios-app.json')) {
+                    await refreshPersistedApps();
+                  }
+                  return trashed;
+                },
+                restore: async (id) => {
+                  const restored = await restoreRecycleBinItem({ id });
+                  window.dispatchEvent(
+                    new CustomEvent('aionios:fs-changed', { detail: { action: 'restore', path: restored.restoredPath } })
+                  );
+                  if (restored.restoredPath.endsWith('.aionios-app.json')) {
+                    await refreshPersistedApps();
+                  }
+                  return restored;
+                },
+                deleteItem: async (id) => {
+                  await deleteRecycleBinItem({ id });
+                },
+                empty: async () => emptyRecycleBin()
               }
             };
 

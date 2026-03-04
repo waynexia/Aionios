@@ -23,6 +23,13 @@ export const APP_CATALOG: AppDefinition[] = [
     kind: 'system'
   },
   {
+    appId: 'recycle-bin',
+    title: 'Recycle Bin',
+    icon: '🗑️',
+    hint: 'Restore or permanently delete files',
+    kind: 'system'
+  },
+  {
     appId: 'media',
     title: 'Media',
     icon: '🎬',
