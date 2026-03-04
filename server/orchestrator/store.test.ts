@@ -145,4 +145,12 @@ describe('system modules', () => {
     expect(source).toContain("import('shiki')");
     expect(isSystemApp('editor')).toBe(true);
   });
+
+  it('provides recycle bin system app source and marks it as system', () => {
+    const source = getSystemModuleSource('recycle-bin');
+    expect(source).toBeDefined();
+    expect(source).toContain('data-recycle-bin-app');
+    expect(source).toContain('host.recycleBin');
+    expect(isSystemApp('recycle-bin')).toBe(true);
+  });
 });

@@ -1,6 +1,7 @@
 import { DIRECTORY_WINDOW_SOURCE } from './system-apps/directory';
 import { EDITOR_WINDOW_SOURCE } from './system-apps/editor';
 import { MEDIA_WINDOW_SOURCE } from './system-apps/media';
+import { RECYCLE_BIN_WINDOW_SOURCE } from './system-apps/recycle-bin';
 import { TERMINAL_WINDOW_SOURCE } from './system-apps/terminal';
 
 const PREFERENCE_WINDOW_SOURCE = `
@@ -297,7 +298,8 @@ const SYSTEM_MODULE_SOURCES = {
   preference: PREFERENCE_WINDOW_SOURCE,
   directory: DIRECTORY_WINDOW_SOURCE,
   media: MEDIA_WINDOW_SOURCE,
-  editor: EDITOR_WINDOW_SOURCE
+  editor: EDITOR_WINDOW_SOURCE,
+  'recycle-bin': RECYCLE_BIN_WINDOW_SOURCE
 } as const;
 
 export function isSystemApp(appId: string): boolean {

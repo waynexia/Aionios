@@ -1,5 +1,5 @@
 export const DIRECTORY_WINDOW_SOURCE = `
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type FileEntry = {
   path: string;
@@ -101,12 +101,17 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const [statusMessage, setStatusMessage] = useState('Loading files...');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    setLoadingList(true);
-    void host.listFiles()
-      .then((entries) => {
-        if (!active) {
+  const loadFileList = useCallback(
+    async (canCommit: () => boolean = () => true) => {
+      if (!canCommit()) {
+        return;
+      }
+      setLoadingList(true);
+      setStatusMessage('Loading files...');
+      setError(null);
+      try {
+        const entries = await host.listFiles();
+        if (!canCommit()) {
           return;
         }
         const nextPaths = toPaths(entries);
@@ -117,26 +122,39 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           }
           return nextPaths[0] ?? null;
         });
-        if (nextPaths.length === 0) {
-          setStatusMessage('No files found. Create one below.');
-        } else {
-          setStatusMessage('Loaded ' + nextPaths.length + ' file(s).');
-        }
-        setError(null);
-        setLoadingList(false);
-      })
-      .catch((reason) => {
-        if (!active) {
+        setStatusMessage(nextPaths.length === 0 ? 'No files found. Create one below.' : 'Loaded ' + nextPaths.length + ' file(s).');
+      } catch (reason) {
+        if (!canCommit()) {
           return;
         }
         setError((reason as Error).message);
         setStatusMessage('Failed to load files.');
-        setLoadingList(false);
-      });
+      } finally {
+        if (canCommit()) {
+          setLoadingList(false);
+        }
+      }
+    },
+    [host]
+  );
+
+  useEffect(() => {
+    let active = true;
+    void loadFileList(() => active);
     return () => {
       active = false;
     };
-  }, []);
+  }, [loadFileList]);
+
+  useEffect(() => {
+    const handler = () => {
+      void loadFileList();
+    };
+    window.addEventListener('aionios:fs-changed', handler);
+    return () => {
+      window.removeEventListener('aionios:fs-changed', handler);
+    };
+  }, [loadFileList]);
 
   useEffect(() => {
     if (!selectedPath) {
