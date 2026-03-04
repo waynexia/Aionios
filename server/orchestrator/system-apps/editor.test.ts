@@ -21,7 +21,7 @@ describe('EDITOR_WINDOW_SOURCE', () => {
   });
 
   it('uses shiki for syntax-highlighted preview rendering', () => {
-    expect(EDITOR_WINDOW_SOURCE).toContain("import('shiki')");
+    expect(EDITOR_WINDOW_SOURCE).toContain("import('shiki/bundle/web')");
     expect(EDITOR_WINDOW_SOURCE).toContain('codeToHtml');
     expect(EDITOR_WINDOW_SOURCE).toContain('dangerouslySetInnerHTML');
   });

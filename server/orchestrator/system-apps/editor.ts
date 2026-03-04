@@ -167,7 +167,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
 
     void (async () => {
       try {
-        const shiki = await import('shiki');
+        const shiki = await import('shiki/bundle/web');
         const highlighted = await shiki.codeToHtml(content.length > 0 ? content : '\\n', {
           lang: language,
           theme: 'github-dark'

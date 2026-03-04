@@ -142,7 +142,7 @@ describe('system modules', () => {
     expect(source).toBeDefined();
     expect(source).toContain('data-editor-app');
     expect(source).toContain('data-editor-textarea');
-    expect(source).toContain("import('shiki')");
+    expect(source).toContain("import('shiki/bundle/web')");
     expect(isSystemApp('editor')).toBe(true);
   });
 
