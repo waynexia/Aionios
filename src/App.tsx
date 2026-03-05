@@ -3,6 +3,7 @@ import { closeWindow } from './api/client';
 import { APP_CATALOG, getAppDefinition } from './app-catalog';
 import { ContextMenu } from './components/ContextMenu';
 import { DesktopIcons } from './components/DesktopIcons';
+import { DesktopWallpaper } from './components/DesktopWallpaper';
 import { Taskbar } from './components/Taskbar';
 import { PromptDialog } from './components/PromptDialog';
 import { RevisionDialog } from './components/RevisionDialog';
@@ -140,6 +141,7 @@ export default function App() {
       onContextMenu={onContextMenu}
     >
       <div className="desktop-shell__workspace">
+        <DesktopWallpaper wallpaper={state.wallpaper} />
         <div className="desktop-shell__items">
           <DesktopIcons apps={desktopApps} onOpenApp={openApp} />
         </div>

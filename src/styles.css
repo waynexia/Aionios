@@ -40,6 +40,26 @@ body,
   overflow: hidden;
 }
 
+.desktop-wallpaper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.desktop-wallpaper__media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.desktop-wallpaper__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.35);
+}
+
 .desktop-shell__items {
   position: absolute;
   inset: 16px;

@@ -59,6 +59,13 @@ export interface HostFileEntry {
   updatedAt: string;
 }
 
+export type WallpaperKind = 'image' | 'video';
+
+export interface WallpaperState {
+  kind: WallpaperKind;
+  source: string;
+}
+
 export interface RecycleBinItem {
   id: string;
   originalPath: string;
@@ -121,6 +128,7 @@ export interface HostBridge {
   writeFile: (path: string, content: string) => Promise<void>;
   requestUpdate: (instruction: string) => Promise<void>;
   listFiles: () => Promise<HostFileEntry[]>;
+  setWallpaper: (wallpaper: WallpaperState | null) => Promise<void>;
   preference: PreferenceHostBridge;
   terminal: TerminalHostBridge;
   recycleBin: RecycleBinHostBridge;

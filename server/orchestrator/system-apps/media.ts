@@ -5,9 +5,15 @@ type HostFileEntry = {
   path: string;
 };
 
+type WallpaperState = {
+  kind: 'image' | 'video';
+  source: string;
+};
+
 type HostBridge = {
   listFiles: () => Promise<HostFileEntry[]>;
   readFile: (path: string) => Promise<string>;
+  setWallpaper: (wallpaper: WallpaperState | null) => Promise<void>;
 };
 
 type WindowProps = {
@@ -190,6 +196,22 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     setStatus('Loaded ' + kind + '.');
   }
 
+  async function updateWallpaper(next: WallpaperState | null) {
+    if (typeof host.setWallpaper !== 'function') {
+      setStatus('Wallpaper API is unavailable.');
+      return;
+    }
+    try {
+      setStatus(next ? 'Setting wallpaper...' : 'Clearing wallpaper...');
+      await host.setWallpaper(next);
+      setStatus(next ? 'Wallpaper updated.' : 'Wallpaper cleared.');
+    } catch (reason) {
+      setStatus('Wallpaper update failed: ' + (reason as Error).message);
+    }
+  }
+
+  const canWallpaper = activeKind === 'image' || activeKind === 'video';
+
   return (
     <div data-media-app style={{ display: 'grid', gridTemplateRows: 'auto auto auto 1fr', gap: 10, height: '100%' }}>
       <header>
@@ -238,6 +260,47 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       <p style={{ margin: 0, fontSize: 12, color: '#bfdbfe' }}>
         {mediaFiles.length > 0 ? 'Host media files: ' + mediaFiles.join(', ') : 'No host media files detected.'}
       </p>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          data-media-set-wallpaper
+          disabled={!canWallpaper || !activeSource}
+          onClick={() => {
+            if (!canWallpaper || !activeSource) {
+              setStatus('Load an image or video first.');
+              return;
+            }
+            void updateWallpaper({ kind: activeKind, source: activeSource } as WallpaperState);
+          }}
+          style={{
+            borderRadius: 8,
+            border: 0,
+            padding: '8px 12px',
+            background: canWallpaper && activeSource ? '#16a34a' : 'rgba(148,163,184,0.25)',
+            color: '#f8fafc',
+            cursor: canWallpaper && activeSource ? 'pointer' : 'not-allowed'
+          }}
+        >
+          Set as Wallpaper
+        </button>
+        <button
+          type="button"
+          data-media-clear-wallpaper
+          onClick={() => {
+            void updateWallpaper(null);
+          }}
+          style={{
+            borderRadius: 8,
+            border: '1px solid rgba(148,163,184,0.35)',
+            padding: '8px 12px',
+            background: 'transparent',
+            color: '#e2e8f0',
+            cursor: 'pointer'
+          }}
+        >
+          Clear Wallpaper
+        </button>
+      </div>
       <section
         data-media-player
         style={{

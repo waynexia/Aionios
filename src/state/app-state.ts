@@ -1,6 +1,7 @@
 import type {
   ClientWindowStatus,
   DesktopWindow,
+  WallpaperState,
   ServerWindowEvent,
   TerminalStateSnapshot,
   UpdateStrategy,
@@ -18,6 +19,7 @@ type WindowServerEvent = Exclude<ServerWindowEvent, TerminalServerEvent | LlmSer
 export interface AppState {
   sessionId?: string;
   bootError?: string;
+  wallpaper: WallpaperState | null;
   windows: DesktopWindow[];
   focusedWindowId?: string;
   nextZIndex: number;
@@ -79,6 +81,10 @@ export type AppAction =
   | {
       type: 'llm-output-clear';
       windowId: string;
+    }
+  | {
+      type: 'desktop-set-wallpaper';
+      wallpaper: WallpaperState | null;
     };
 
 const MAX_TERMINAL_BUFFER_CHARS = 40_000;
@@ -90,6 +96,7 @@ const WINDOW_CASCADE_Y = 26;
 const WINDOW_CASCADE_LIMIT = 6;
 
 export const initialState: AppState = {
+  wallpaper: null,
   windows: [],
   nextZIndex: 10,
   terminals: {},
@@ -307,6 +314,11 @@ function applyServerEvent(state: AppState, event: ServerWindowEvent): AppState {
 
 export function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
+    case 'desktop-set-wallpaper':
+      return {
+        ...state,
+        wallpaper: action.wallpaper
+      };
     case 'session-ready':
       return {
         ...state,

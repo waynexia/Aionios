@@ -14,4 +14,6 @@ export const RECYCLE_BIN_DRAFT_CONTENT = 'CDP recycle bin check payload.';
 export const MEDIA_SOURCE_DATA_URL =
   'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=';
 
+export const MEDIA_VIDEO_SOURCE_DATA_URL = 'data:video/mp4;base64,AAAA';
+
 export const EDITOR_MARKER = 'CDP_EDITOR_MARKER_20260301';

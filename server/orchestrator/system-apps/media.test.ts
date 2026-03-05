@@ -7,12 +7,15 @@ describe('MEDIA_WINDOW_SOURCE', () => {
     expect(MEDIA_WINDOW_SOURCE).toContain('data-media-app');
     expect(MEDIA_WINDOW_SOURCE).toContain('data-media-source');
     expect(MEDIA_WINDOW_SOURCE).toContain('data-media-load');
+    expect(MEDIA_WINDOW_SOURCE).toContain('data-media-set-wallpaper');
+    expect(MEDIA_WINDOW_SOURCE).toContain('data-media-clear-wallpaper');
     expect(MEDIA_WINDOW_SOURCE).toContain('data-media-player');
   });
 
   it('uses host file APIs and renders media players', () => {
     expect(MEDIA_WINDOW_SOURCE).toContain('.listFiles()');
     expect(MEDIA_WINDOW_SOURCE).toContain('host.readFile');
+    expect(MEDIA_WINDOW_SOURCE).toContain('host.setWallpaper');
     expect(MEDIA_WINDOW_SOURCE).toContain('windowState.launch');
     expect(MEDIA_WINDOW_SOURCE).toContain('<img');
     expect(MEDIA_WINDOW_SOURCE).toContain('<audio');

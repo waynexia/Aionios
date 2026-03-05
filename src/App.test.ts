@@ -190,3 +190,27 @@ describe('window event ordering guard', () => {
     });
   });
 });
+
+describe('desktop wallpaper state', () => {
+  it('sets and clears wallpaper via reducer', () => {
+    const withWallpaper = reducer(initialState, {
+      type: 'desktop-set-wallpaper',
+      wallpaper: {
+        kind: 'image',
+        source: 'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA='
+      }
+    });
+
+    expect(withWallpaper.wallpaper).toEqual({
+      kind: 'image',
+      source: 'data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA='
+    });
+
+    const cleared = reducer(withWallpaper, {
+      type: 'desktop-set-wallpaper',
+      wallpaper: null
+    });
+
+    expect(cleared.wallpaper).toBeNull();
+  });
+});

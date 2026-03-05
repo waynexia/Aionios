@@ -17,8 +17,31 @@ import {
 import { dispatchFsChanged } from '../aionios-events';
 import { isAppDescriptorPath } from '../open-file';
 import type { AppAction } from '../state/app-state';
-import type { DesktopWindow, HostBridge, TerminalStateSnapshot } from '../types';
+import type { DesktopWindow, HostBridge, TerminalStateSnapshot, WallpaperState } from '../types';
 import { WindowRuntime } from './WindowRuntime';
+
+function sanitizeWallpaper(value: unknown): WallpaperState | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== 'object') {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const kind = record.kind;
+  const source = record.source;
+  if (kind !== 'image' && kind !== 'video') {
+    return null;
+  }
+  if (typeof source !== 'string') {
+    return null;
+  }
+  const trimmedSource = source.trim();
+  if (!trimmedSource) {
+    return null;
+  }
+  return { kind, source: trimmedSource };
+}
 
 export interface WindowRuntimeWithHostBridgeProps {
   activeSessionId: string;
@@ -62,6 +85,12 @@ export function WindowRuntimeWithHostBridge({
         await requestUpdateForWindow(windowItem.windowId, instruction);
       },
       listFiles: async () => (await listHostFiles()).files,
+      setWallpaper: async (wallpaper) => {
+        dispatch({
+          type: 'desktop-set-wallpaper',
+          wallpaper: sanitizeWallpaper(wallpaper)
+        });
+      },
       preference: {
         read: async () => getPreferenceConfig(),
         update: async (input) => updatePreferenceConfig(input)
