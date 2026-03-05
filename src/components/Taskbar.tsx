@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 interface TaskbarProps {
   windows: DesktopWindow[];
   focusedWindowId?: string;
+  onStartClick: () => void;
   onWindowClick: (windowId: string) => void;
 }
 
@@ -44,13 +45,21 @@ function TaskbarClock() {
   );
 }
 
-export function Taskbar({ windows, focusedWindowId, onWindowClick }: TaskbarProps) {
+export function Taskbar({ windows, focusedWindowId, onStartClick, onWindowClick }: TaskbarProps) {
   return (
     <footer className="taskbar">
-      <div className="taskbar__start">
+      <button
+        type="button"
+        className="taskbar__start"
+        data-taskbar-start
+        aria-label="Quick create"
+        onClick={() => {
+          onStartClick();
+        }}
+      >
         <img className="taskbar__start-icon" src="/icons/icon-white-48x48.png" alt="" />
         <span>Aionios</span>
-      </div>
+      </button>
       <div className="taskbar__windows">
         {windows.map((windowItem) => (
           <button

@@ -1,6 +1,7 @@
 import brandingIcons from './branding-icons.mjs';
 import contextMenu from './context-menu.mjs';
 import createNewFile from './create-new-file.mjs';
+import quickCreate from './quick-create.mjs';
 import desktopIcons from './desktop-icons.mjs';
 import desktopShell from './desktop-shell.mjs';
 import directory from './directory.mjs';
@@ -19,6 +20,7 @@ export const cases = [
   desktopShell,
   brandingIcons,
   taskbarClock,
+  quickCreate,
   contextMenu,
   persistedApp,
   createNewFile,
