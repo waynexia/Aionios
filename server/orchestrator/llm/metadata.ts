@@ -14,6 +14,29 @@ const EMOJI_CODEPOINT_RANGES = [
 ] as const;
 
 const EXTENDED_PICTOGRAPHIC_PATTERN = /^\p{Extended_Pictographic}$/u;
+const NAME_WORD_PATTERN = /[\p{L}\p{N}]+/gu;
+const GENERIC_NAME_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'app',
+  'application',
+  'build',
+  'create',
+  'file',
+  'for',
+  'generate',
+  'generated',
+  'make',
+  'new',
+  'of',
+  'or',
+  'the',
+  'to',
+  'tool',
+  'window',
+  'with'
+]);
 
 const TOTAL_CODEPOINT_SPAN = EMOJI_CODEPOINT_RANGES.reduce(
   (total, [start, end]) => total + (end - start + 1),
@@ -109,16 +132,16 @@ function firstContentLine(input: string) {
 }
 
 function fallbackTitle(input: SuggestArtifactMetadataRequest) {
+  const firstLine = firstContentLine(input.instruction);
+  if (firstLine) {
+    return firstLine;
+  }
   const providedTitle =
     typeof input.title === 'string' && input.title.trim().length > 0
       ? collapseWhitespace(stripControlCharacters(input.title))
       : '';
   if (providedTitle) {
     return providedTitle;
-  }
-  const firstLine = firstContentLine(input.instruction);
-  if (firstLine) {
-    return firstLine;
   }
   if (input.kind === 'app') {
     return 'New App';
@@ -129,52 +152,78 @@ function fallbackTitle(input: SuggestArtifactMetadataRequest) {
   return 'Generated Window';
 }
 
-function sanitizeTitle(value: unknown, fallback: string) {
-  if (typeof value !== 'string') {
-    return fallback;
+function defaultArtifactBaseName(kind: SuggestArtifactMetadataRequest['kind']) {
+  if (kind === 'app') {
+    return 'New App';
   }
-  const withoutControls = stripControlCharacters(value);
-  const cleaned = collapseWhitespace(
-    withoutControls.replace(/[<>:"/\\|?*]+/g, ' ').replace(/[`]+/g, '')
-  );
-  if (!cleaned) {
-    return fallback;
-  }
-  return cleaned.length > 42 ? `${cleaned.slice(0, 41).trim()}…` : cleaned;
-}
-
-function titleToFileStem(title: string) {
-  const cleaned = collapseWhitespace(
-    stripControlCharacters(title).replace(/[<>:"/\\|?*]+/g, ' ').replace(/[.]+$/g, '')
-  );
-  if (!cleaned) {
+  if (kind === 'file') {
     return 'New File';
   }
-  const bounded = cleaned.length > 48 ? cleaned.slice(0, 48).trim() : cleaned;
-  return bounded || 'New File';
+  return 'Generated Window';
 }
 
-function sanitizeFileName(value: unknown, extension: string, fallback: string) {
+function stripTrailingExtension(input: string, extension: string) {
+  if (!input) {
+    return '';
+  }
+  if (extension && input.toLowerCase().endsWith(extension)) {
+    return input.slice(0, -extension.length);
+  }
+  const lastDotIndex = input.lastIndexOf('.');
+  if (lastDotIndex > 0) {
+    return input.slice(0, lastDotIndex);
+  }
+  return input;
+}
+
+function extractNameWords(input: string) {
+  const cleaned = collapseWhitespace(
+    stripControlCharacters(input)
+      .replaceAll('\\', ' ')
+      .replaceAll('/', ' ')
+      .replace(/[<>:"|?*`]+/g, ' ')
+      .replace(/[-_]+/g, ' ')
+  );
+  const words = cleaned.match(NAME_WORD_PATTERN) ?? [];
+  if (words.length === 0) {
+    return [];
+  }
+  const filtered = words.filter((word) => !GENERIC_NAME_WORDS.has(word.toLowerCase()));
+  return (filtered.length > 0 ? filtered : words).slice(0, 3);
+}
+
+function formatNameWord(word: string) {
+  const chars = Array.from(word.trim());
+  if (chars.length === 0) {
+    return '';
+  }
+  const [head, ...tail] = chars;
+  return `${head.toLocaleUpperCase()}${tail.join('').toLocaleLowerCase()}`;
+}
+
+function sanitizeSharedName(value: unknown, extension: string, fallback: string) {
   const raw = typeof value === 'string' ? value : '';
-  const withoutControls = stripControlCharacters(raw)
+  const leaf = stripControlCharacters(raw)
     .replaceAll('\\', '/')
     .split('/')
     .at(-1) ?? '';
-  const withoutReserved = collapseWhitespace(
-    withoutControls.replace(/[<>:"/\\|?*]+/g, ' ').replace(/^\.+/, '')
-  );
-  let stem = withoutReserved;
-  if (extension && stem.toLowerCase().endsWith(extension)) {
-    stem = stem.slice(0, -extension.length);
-  } else {
-    const lastDotIndex = stem.lastIndexOf('.');
-    if (lastDotIndex > 0) {
-      stem = stem.slice(0, lastDotIndex);
-    }
-  }
-  const boundedStem = collapseWhitespace(stem).slice(0, 48).trim();
-  const safeStem = boundedStem || fallback;
-  return extension ? `${safeStem}${extension}` : safeStem;
+  const fallbackLeaf = stripControlCharacters(fallback)
+    .replaceAll('\\', '/')
+    .split('/')
+    .at(-1) ?? '';
+  const words = extractNameWords(stripTrailingExtension(leaf, extension));
+  const fallbackWords = extractNameWords(stripTrailingExtension(fallbackLeaf, extension));
+  const selectedWords = (words.length > 0 ? words : fallbackWords).map(formatNameWord);
+  const fallbackBaseName = fallbackWords.map(formatNameWord).join('-');
+  const defaultBaseName = fallbackBaseName || 'New-File';
+  const candidateBaseName = selectedWords.join('-') || defaultBaseName;
+  const maxBaseLength = Math.max(8, 42 - extension.length);
+  const boundedBaseName =
+    candidateBaseName.length > maxBaseLength
+      ? candidateBaseName.slice(0, maxBaseLength).replace(/-+$/g, '')
+      : candidateBaseName;
+  const safeBaseName = boundedBaseName || candidateBaseName || defaultBaseName;
+  return extension ? `${safeBaseName}${extension}` : safeBaseName;
 }
 
 function extractJsonObject(raw: string) {
@@ -190,12 +239,15 @@ export function buildFallbackArtifactMetadata(
   input: SuggestArtifactMetadataRequest
 ): SuggestArtifactMetadataResult {
   const extension = normalizeExtension(input.extension);
-  const title = sanitizeTitle(fallbackTitle(input), input.kind === 'app' ? 'New App' : 'New File');
-  const fileName = sanitizeFileName(undefined, extension, titleToFileStem(title));
+  const sharedName = sanitizeSharedName(
+    fallbackTitle(input),
+    extension,
+    defaultArtifactBaseName(input.kind)
+  );
   return {
-    emoji: fallbackEmoji(`${input.kind}:${input.appId ?? ''}:${input.instruction}:${title}`),
-    title,
-    fileName,
+    emoji: fallbackEmoji(`${input.kind}:${input.appId ?? ''}:${input.instruction}:${sharedName}`),
+    title: sharedName,
+    fileName: sharedName,
     backend: 'fallback'
   };
 }
@@ -203,8 +255,8 @@ export function buildFallbackArtifactMetadata(
 export function buildArtifactMetadataPrompt(input: SuggestArtifactMetadataRequest) {
   const extension = normalizeExtension(input.extension);
   const expectedFileRule = extension
-    ? `The fileName must end with "${extension}".`
-    : 'The fileName must not contain any directory separators.';
+    ? `Both title and fileName must end with "${extension}".`
+    : 'Do not add an extension unless the prompt clearly requires one.';
   return [
     'You are naming a generated artifact for a desktop environment.',
     'Return strict JSON only with this exact shape:',
@@ -212,10 +264,12 @@ export function buildArtifactMetadataPrompt(input: SuggestArtifactMetadataReques
     '',
     'Rules:',
     '- emoji must be exactly one emoji.',
-    '- title must be short, human-readable, and under 42 characters.',
-    `- fileName must be a concise file name for a ${input.kind}.`,
+    '- title and fileName must be exactly the same string.',
+    '- Use at most three words.',
+    '- Do not use spaces; join words with "-" if needed.',
+    '- Keep the shared name short and human-readable.',
     `- ${expectedFileRule}`,
-    '- fileName must not include directories.',
+    '- title and fileName must not include directories.',
     '- Match the user prompt closely.',
     '',
     `Kind: ${input.kind}`,
@@ -248,12 +302,17 @@ export function parseArtifactMetadataResponse(
     }
 
     const extension = normalizeExtension(input.extension);
-    const title = sanitizeTitle(parsed.title, fallback.title);
-    const fileName = sanitizeFileName(parsed.fileName, extension, titleToFileStem(title));
+    const sharedName = sanitizeSharedName(
+      typeof parsed.fileName === 'string' && parsed.fileName.trim().length > 0
+        ? parsed.fileName
+        : parsed.title,
+      extension,
+      fallback.fileName
+    );
     return {
       emoji: sanitizeEmoji(parsed.emoji, fallback.emoji),
-      title,
-      fileName,
+      title: sharedName,
+      fileName: sharedName,
       backend
     };
   } catch {
