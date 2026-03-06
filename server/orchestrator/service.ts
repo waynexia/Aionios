@@ -4,107 +4,27 @@ import type { PersistedAppStore } from '../storage/persisted-apps';
 import { buildGenerationPrompt, createContextEntry } from './context';
 import { SessionEventBus } from './event-bus';
 import { createLlmProvider } from './llm/provider';
+import {
+  extractUserInstructionFromPrompt,
+  hydrateRedactedPreviousSource,
+  redactPreviousSource
+} from './prompt-utils';
 import { SessionStore } from './store';
 import { getSystemModuleSource, isSystemApp } from './system-modules';
 import type {
   SessionEvent,
   ModuleUpdateBridge,
   OpenWindowInput,
-  UpdateStrategy,
   WindowActionInput,
   WindowRevision,
   WindowSnapshot
 } from './types';
+import { pickUpdateStrategy } from './update-strategy';
 import { validateGeneratedSource } from './validator';
+import { buildWindowFallbackSource } from './window-fallback-source';
 
 function buildWindowKey(sessionId: string, windowId: string) {
   return `${sessionId}:${windowId}`;
-}
-
-function pickUpdateStrategy(previousSource: string | undefined, nextSource: string): UpdateStrategy {
-  if (!previousSource) {
-    return 'remount';
-  }
-
-  const importPattern = /import[\s\S]*?from\s*['"]([^'"]+)['"]/g;
-  const currentImports = Array.from(previousSource.matchAll(importPattern))
-    .map((entry) => entry[1])
-    .sort();
-  const nextImports = Array.from(nextSource.matchAll(importPattern))
-    .map((entry) => entry[1])
-    .sort();
-  if (currentImports.join(',') !== nextImports.join(',')) {
-    return 'remount';
-  }
-
-  const hasDefaultWindowExport =
-    /export\s+default\s+function\s+WindowApp\b/.test(previousSource) &&
-    /export\s+default\s+function\s+WindowApp\b/.test(nextSource);
-  return hasDefaultWindowExport ? 'hmr' : 'remount';
-}
-
-function redactPreviousSource(prompt: string) {
-  const startMarker = 'Previous module source:';
-  const endMarker = 'Return only TSX module code.';
-  const startIndex = prompt.indexOf(startMarker);
-  if (startIndex === -1) {
-    return prompt;
-  }
-  const endIndex = prompt.indexOf(endMarker, startIndex);
-  const redacted = `${startMarker}\n[redacted]\n\n`;
-  if (endIndex === -1) {
-    return `${prompt.slice(0, startIndex)}${redacted}`.trimEnd();
-  }
-  return `${prompt.slice(0, startIndex)}${redacted}${prompt.slice(endIndex)}`.trimEnd();
-}
-
-function extractUserInstructionFromPrompt(prompt: string) {
-  const startMarker = 'User instruction for this update:';
-  const endMarker = '\nRecent context:';
-  const startIndex = prompt.indexOf(startMarker);
-  if (startIndex === -1) {
-    return undefined;
-  }
-  let contentStart = startIndex + startMarker.length;
-  if (prompt[contentStart] === '\r' && prompt[contentStart + 1] === '\n') {
-    contentStart += 2;
-  } else if (prompt[contentStart] === '\n') {
-    contentStart += 1;
-  }
-  const endIndex = prompt.indexOf(endMarker, contentStart);
-  const content = endIndex === -1 ? prompt.slice(contentStart) : prompt.slice(contentStart, endIndex);
-  const trimmed = content.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function hydrateRedactedPreviousSource(prompt: string, previousSource: string | undefined) {
-  if (!previousSource) {
-    return prompt;
-  }
-  const startMarker = 'Previous module source:';
-  const endMarker = 'Return only TSX module code.';
-  const startIndex = prompt.indexOf(startMarker);
-  if (startIndex === -1) {
-    const firstRenderMarker = 'No previous source exists yet (first render).';
-    const firstRenderIndex = prompt.indexOf(firstRenderMarker);
-    if (firstRenderIndex === -1) {
-      return prompt;
-    }
-    const hydrated = `${startMarker}\n${previousSource}\n\n`;
-    return `${prompt.slice(0, firstRenderIndex)}${hydrated}${prompt.slice(
-      firstRenderIndex + firstRenderMarker.length
-    )}`.trimEnd();
-  }
-  const endIndex = prompt.indexOf(endMarker, startIndex);
-  if (endIndex === -1) {
-    return prompt;
-  }
-  const section = prompt.slice(startIndex, endIndex);
-  if (!section.includes('[redacted]')) {
-    return prompt;
-  }
-  const hydrated = `${startMarker}\n${previousSource}\n\n`;
-  return `${prompt.slice(0, startIndex)}${hydrated}${prompt.slice(endIndex)}`.trimEnd();
 }
 
 export class WindowOrchestrator {
@@ -563,41 +483,7 @@ export class WindowOrchestrator {
     if (snapshot) {
       return snapshot;
     }
-
-    if (!record) {
-      return {
-        revision: 0,
-        source: `
-import React from 'react';
-export default function WindowApp() {
-  return <div style={{ padding: 16, color: '#f8fafc' }}>Window not found.</div>;
-}
-`.trim()
-      };
-    }
-
-    if (record.status === 'error') {
-      const message = record.error ?? 'Unknown error';
-      return {
-        revision: 0,
-        source: `
-import React from 'react';
-export default function WindowApp() {
-  return <div style={{ padding: 16, color: '#fecaca' }}>Generation failed: ${JSON.stringify(message)}</div>;
-}
-`.trim()
-      };
-    }
-
-    return {
-      revision: 0,
-      source: `
-import React from 'react';
-export default function WindowApp() {
-  return <div style={{ padding: 16, color: '#cbd5e1' }}>Generating window module…</div>;
-}
-`.trim()
-    };
+    return buildWindowFallbackSource(record);
   }
 
   private async enqueueWindowTask(
