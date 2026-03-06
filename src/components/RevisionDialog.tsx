@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  getWindowRevisionPrompt,
   listWindowRevisions,
   regenerateWindowRevision,
-  requestWindowPromptUpdate,
   rollbackWindow
 } from '../api/client';
+import { useRevisionPromptViewer } from '../hooks/useRevisionPromptViewer';
 import type { ClientWindowStatus, WindowRevisionSummary } from '../types';
 
 interface RevisionDialogProps {
@@ -48,17 +47,35 @@ export function RevisionDialog({
   const [rollingBackTo, setRollingBackTo] = useState<number | null>(null);
   const [branchingRevision, setBranchingRevision] = useState<number | null>(null);
   const [regeneratingRevision, setRegeneratingRevision] = useState<number | null>(null);
-  const [promptRevision, setPromptRevision] = useState<number | null>(null);
-  const [promptLoaded, setPromptLoaded] = useState<string>('');
-  const [promptDraft, setPromptDraft] = useState<string>('');
-  const [promptError, setPromptError] = useState<string | null>(null);
-  const [promptLoading, setPromptLoading] = useState(false);
-  const [promptEditing, setPromptEditing] = useState(false);
-  const [promptSubmitting, setPromptSubmitting] = useState(false);
+  const {
+    promptRevision,
+    promptLoaded,
+    promptDraft,
+    promptError,
+    promptLoading,
+    promptEditing,
+    promptSubmitting,
+    setPromptDraft,
+    viewPrompt,
+    copyPrompt,
+    closePromptViewer,
+    resetPrompt,
+    startPromptEditing,
+    regenerateFromPrompt
+  } = useRevisionPromptViewer({
+    open,
+    sessionId,
+    windowId
+  });
 
   const orderedRevisions = useMemo(() => sortByRevisionDesc(revisions), [revisions]);
   const hasRevisions = orderedRevisions.length > 0;
   const windowIsLoading = windowStatus === 'loading';
+  const hasPendingRevisionAction =
+    rollingBackTo !== null || branchingRevision !== null || regeneratingRevision !== null;
+  const disablePromptActions = hasPendingRevisionAction || loading;
+  const disableMutatingRevisionActions =
+    hasPendingRevisionAction || loading || windowIsLoading;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -109,84 +126,9 @@ export function RevisionDialog({
     if (open) {
       return;
     }
-    setPromptRevision(null);
-    setPromptLoaded('');
-    setPromptDraft('');
-    setPromptError(null);
-    setPromptLoading(false);
-    setPromptEditing(false);
-    setPromptSubmitting(false);
     setBranchingRevision(null);
     setRegeneratingRevision(null);
   }, [open]);
-
-  const viewPrompt = useCallback(
-    async (revision: number) => {
-      setPromptLoading(true);
-      setPromptError(null);
-      setPromptEditing(false);
-      setPromptSubmitting(false);
-      try {
-        const detail = await getWindowRevisionPrompt({ sessionId, windowId, revision });
-        setPromptRevision(detail.revision);
-        setPromptLoaded(detail.prompt);
-        setPromptDraft(detail.prompt);
-      } catch (reason) {
-        setPromptError((reason as Error).message);
-        setPromptRevision(revision);
-        setPromptLoaded('');
-        setPromptDraft('');
-      } finally {
-        setPromptLoading(false);
-      }
-    },
-    [sessionId, windowId]
-  );
-
-  const copyPrompt = useCallback(async () => {
-    if (!promptDraft) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(promptDraft);
-    } catch (reason) {
-      setPromptError((reason as Error).message);
-    }
-  }, [promptDraft]);
-
-  const closePromptViewer = useCallback(() => {
-    setPromptRevision(null);
-    setPromptLoaded('');
-    setPromptDraft('');
-    setPromptError(null);
-    setPromptEditing(false);
-    setPromptSubmitting(false);
-  }, []);
-
-  const resetPrompt = useCallback(() => {
-    setPromptDraft(promptLoaded);
-    setPromptError(null);
-  }, [promptLoaded]);
-
-  const regenerateFromPrompt = useCallback(async () => {
-    if (promptRevision === null) {
-      return;
-    }
-    setPromptSubmitting(true);
-    setPromptError(null);
-    try {
-      await requestWindowPromptUpdate({
-        sessionId,
-        windowId,
-        prompt: promptDraft
-      });
-      setPromptEditing(false);
-    } catch (reason) {
-      setPromptError((reason as Error).message);
-    } finally {
-      setPromptSubmitting(false);
-    }
-  }, [promptDraft, promptRevision, sessionId, windowId]);
 
   if (!open) {
     return null;
@@ -266,12 +208,7 @@ export function RevisionDialog({
                       type="button"
                       className="revision-dialog__button revision-dialog__button--ghost"
                       data-revision-prompt={revision.revision}
-                      disabled={
-                        rollingBackTo !== null ||
-                        branchingRevision !== null ||
-                        regeneratingRevision !== null ||
-                        loading
-                      }
+                      disabled={disablePromptActions}
                       onClick={() => {
                         void viewPrompt(revision.revision);
                       }}
@@ -282,13 +219,7 @@ export function RevisionDialog({
                       type="button"
                       className="revision-dialog__button revision-dialog__button--ghost"
                       data-revision-regenerate={revision.revision}
-                      disabled={
-                        rollingBackTo !== null ||
-                        branchingRevision !== null ||
-                        regeneratingRevision !== null ||
-                        loading ||
-                        windowIsLoading
-                      }
+                      disabled={disableMutatingRevisionActions}
                       onClick={async () => {
                         setRegeneratingRevision(revision.revision);
                         setError(null);
@@ -311,12 +242,7 @@ export function RevisionDialog({
                       type="button"
                       className="revision-dialog__button revision-dialog__button--ghost"
                       data-revision-branch={revision.revision}
-                      disabled={
-                        rollingBackTo !== null ||
-                        branchingRevision !== null ||
-                        regeneratingRevision !== null ||
-                        loading
-                      }
+                      disabled={disablePromptActions}
                       onClick={async () => {
                         setBranchingRevision(revision.revision);
                         setError(null);
@@ -337,11 +263,7 @@ export function RevisionDialog({
                       data-revision-rollback={revision.revision}
                       disabled={
                         isCurrent ||
-                        rollingBackTo !== null ||
-                        branchingRevision !== null ||
-                        regeneratingRevision !== null ||
-                        loading ||
-                        windowIsLoading
+                        disableMutatingRevisionActions
                       }
                       onClick={async () => {
                         setRollingBackTo(revision.revision);
@@ -417,8 +339,7 @@ export function RevisionDialog({
                       data-revision-prompt-edit
                       disabled={promptLoading || promptSubmitting}
                       onClick={() => {
-                        setPromptEditing(true);
-                        setPromptError(null);
+                        startPromptEditing();
                       }}
                     >
                       Edit
