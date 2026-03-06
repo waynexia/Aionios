@@ -58,7 +58,7 @@ export function deriveDescriptorBaseName(title: string) {
   const trimmed = title.trim();
   const collapsed = trimmed.replace(/\s+/g, ' ').trim();
   const replacedSlashes = collapsed.replaceAll('/', '-').replaceAll('\\', '-');
-  const withoutControl = stripControlCharacters(replacedSlashes);
+  const withoutControl = stripControlCharacters(replacedSlashes).replace(/[<>:"|?*]/g, '-');
   const maxLength = 42;
   const bounded = withoutControl.length > maxLength ? withoutControl.slice(0, maxLength).trim() : withoutControl;
   return bounded.length > 0 ? bounded : 'New App';
@@ -144,7 +144,7 @@ export async function listAppDescriptors(hostFs: HostFileSystem, input?: { direc
 
 export async function createAppDescriptor(
   hostFs: HostFileSystem,
-  input: { directory?: string; appId: string; title: string; icon?: string }
+  input: { directory?: string; appId: string; title: string; icon?: string; fileName?: string }
 ): Promise<PersistedAppDescriptor> {
   const normalizedDir = hostFs.normalizeDir(input.directory);
   const createdAt = new Date().toISOString();
@@ -155,7 +155,14 @@ export async function createAppDescriptor(
   const icon =
     typeof input.icon === 'string' && input.icon.trim().length > 0 ? input.icon.trim() : '🧩';
 
-  const baseName = deriveDescriptorBaseName(title);
+  const requestedFileName =
+    typeof input.fileName === 'string' && input.fileName.trim().length > 0
+      ? input.fileName.trim()
+      : '';
+  const fileStem = requestedFileName.toLowerCase().endsWith(APP_DESCRIPTOR_EXTENSION)
+    ? requestedFileName.slice(0, -APP_DESCRIPTOR_EXTENSION.length)
+    : requestedFileName;
+  const baseName = deriveDescriptorBaseName(fileStem || title);
   const descriptorPath = await hostFs.createUniqueFilePath({
     directory: normalizedDir,
     baseName,

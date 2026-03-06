@@ -3,7 +3,17 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { buildGenerationPrompt } from '../context';
-import type { GenerateRequest, GenerateResult, LlmProvider } from '../types';
+import type {
+  GenerateRequest,
+  GenerateResult,
+  LlmProvider,
+  SuggestArtifactMetadataRequest,
+  SuggestArtifactMetadataResult
+} from '../types';
+import {
+  buildArtifactMetadataPrompt,
+  parseArtifactMetadataResponse
+} from './metadata';
 import { unwrapCodeBlock } from './utils';
 
 export interface CodexProviderOptions {
@@ -296,5 +306,16 @@ export class CodexExecProvider implements LlmProvider {
       source: unwrapCodeBlock(raw),
       backend: 'codex'
     };
+  }
+
+  async suggestArtifactMetadata(
+    request: SuggestArtifactMetadataRequest
+  ): Promise<SuggestArtifactMetadataResult> {
+    const raw = await runCodexCommand(
+      this.options.command,
+      buildArtifactMetadataPrompt(request),
+      Math.min(this.options.timeoutMs, 30_000)
+    );
+    return parseArtifactMetadataResponse(raw, request, 'codex');
   }
 }

@@ -23,6 +23,7 @@ export function useSessionBootstrap(options: { dispatch: (action: AppAction) => 
             sessionId: snapshot.sessionId,
             appId: snapshot.appId,
             title: snapshot.title,
+            generationSelection: snapshot.generationSelection,
             initialStatus: snapshot.status,
             initialRevision: snapshot.revision,
             initialError: snapshot.error

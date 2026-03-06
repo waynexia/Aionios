@@ -1,6 +1,7 @@
 import type {
   ClientWindowStatus,
   DesktopWindow,
+  GenerationSelection,
   WallpaperState,
   ServerWindowEvent,
   TerminalStateSnapshot,
@@ -47,6 +48,7 @@ export type AppAction =
       sessionId: string;
       appId: string;
       title: string;
+      generationSelection?: GenerationSelection;
       initialStatus?: ClientWindowStatus;
       initialRevision?: number;
       initialError?: string;
@@ -276,6 +278,7 @@ function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
       return {
         ...windowItem,
         title: event.title ?? windowItem.title,
+        generationSelection: event.generationSelection ?? windowItem.generationSelection,
         status,
         revision: event.revision ?? windowItem.revision,
         strategy,
@@ -343,6 +346,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
             sessionId: action.sessionId,
             appId: action.appId,
             title: action.title,
+            generationSelection: action.generationSelection ?? windowItem.generationSelection,
             launch: action.launch ?? windowItem.launch,
             status: action.initialStatus ?? windowItem.status,
             revision: action.initialRevision ?? windowItem.revision,
@@ -359,6 +363,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         sessionId: action.sessionId,
         appId: action.appId,
         title: action.title,
+        generationSelection: action.generationSelection,
         launch: action.launch,
         x: initialBounds.x,
         y: initialBounds.y,

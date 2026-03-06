@@ -3,6 +3,7 @@ import type { PreferenceConfig } from '../config';
 import type { PersistedAppStore } from '../storage/persisted-apps';
 import { buildGenerationPrompt, createContextEntry } from './context';
 import { SessionEventBus } from './event-bus';
+import { buildFallbackArtifactMetadata } from './llm/metadata';
 import { createLlmProvider } from './llm/provider';
 import {
   extractUserInstructionFromPrompt,
@@ -15,7 +16,10 @@ import type {
   SessionEvent,
   ModuleUpdateBridge,
   OpenWindowInput,
+  SuggestArtifactMetadataRequest,
+  SuggestArtifactMetadataResult,
   WindowActionInput,
+  WindowGenerationSelection,
   WindowRevision,
   WindowSnapshot
 } from './types';
@@ -82,6 +86,7 @@ export class WindowOrchestrator {
         windowId: snapshot.windowId,
         appId: snapshot.appId,
         title: snapshot.title,
+        generationSelection: snapshot.generationSelection,
         status: snapshot.status,
         revision: snapshot.revision,
         strategy,
@@ -115,10 +120,50 @@ export class WindowOrchestrator {
       windowId,
       appId: record.appId,
       title: record.title,
+      generationSelection: record.generationSelection,
       status: record.status,
       revision: record.revisions.at(-1)?.revision ?? 0,
       error: record.error
-      };
+    };
+  }
+
+  async suggestArtifactMetadata(
+    input: SuggestArtifactMetadataRequest
+  ): Promise<SuggestArtifactMetadataResult> {
+    const fallback = buildFallbackArtifactMetadata(input);
+    try {
+      return await createLlmProvider(this.readConfig()).suggestArtifactMetadata(input);
+    } catch (error) {
+      console.warn('[aionios] unable to suggest artifact metadata', error);
+      return fallback;
+    }
+  }
+
+  private async resolveWindowGenerationSelection(input: {
+    sessionId: string;
+    windowId: string;
+    appId: string;
+    title: string;
+    instruction?: string;
+  }): Promise<WindowGenerationSelection | undefined> {
+    const instruction = input.instruction?.trim();
+    if (!instruction) {
+      return undefined;
+    }
+
+    const metadata = await this.suggestArtifactMetadata({
+      kind: 'window',
+      sessionId: input.sessionId,
+      windowId: input.windowId,
+      appId: input.appId,
+      title: input.title,
+      instruction
+    });
+
+    return {
+      emoji: metadata.emoji,
+      fileName: metadata.fileName
+    };
   }
 
   listWindowRevisions(sessionId: string, windowId: string) {
@@ -176,6 +221,18 @@ export class WindowOrchestrator {
         createContextEntry('user', input.instruction)
       );
     }
+    if (input.generationSelection) {
+      this.store.setGenerationSelection(input.sessionId, input.windowId, input.generationSelection);
+    } else if (!isSystemApp(windowRecord.appId) && input.instruction) {
+      const generationSelection = await this.resolveWindowGenerationSelection({
+        sessionId: input.sessionId,
+        windowId: input.windowId,
+        appId: input.appId,
+        title: input.title,
+        instruction: input.instruction
+      });
+      this.store.setGenerationSelection(input.sessionId, input.windowId, generationSelection);
+    }
 
     const systemSource = getSystemModuleSource(windowRecord.appId);
     if (systemSource) {
@@ -198,6 +255,7 @@ export class WindowOrchestrator {
         windowId: input.windowId,
         appId: input.appId,
         title: input.title,
+        generationSelection: windowRecord.generationSelection,
         status: 'ready',
         revision: revision.revision,
         strategy: 'remount'
@@ -208,6 +266,7 @@ export class WindowOrchestrator {
         windowId: input.windowId,
         appId: windowRecord.appId,
         title: windowRecord.title,
+        generationSelection: windowRecord.generationSelection,
         status: windowRecord.status,
         revision: revision.revision
       };
@@ -242,6 +301,7 @@ export class WindowOrchestrator {
           windowId: input.windowId,
           appId: input.appId,
           title: input.title,
+          generationSelection: windowRecord.generationSelection,
           status: 'ready',
           revision: persistedSnapshot.revision,
           strategy: 'remount'
@@ -256,6 +316,7 @@ export class WindowOrchestrator {
         windowId: input.windowId,
         appId: input.appId,
         title: input.title,
+        generationSelection: windowRecord.generationSelection,
         status: 'loading',
         revision: persistedSnapshot.revision,
         strategy: 'remount'
@@ -281,6 +342,7 @@ export class WindowOrchestrator {
       windowId: input.windowId,
       appId: input.appId,
       title: input.title,
+      generationSelection: windowRecord.generationSelection,
       status: 'loading'
     });
 
@@ -300,12 +362,13 @@ export class WindowOrchestrator {
       windowId: input.windowId,
       appId: windowRecord.appId,
       title: windowRecord.title,
+      generationSelection: windowRecord.generationSelection,
       status: windowRecord.status,
       revision: windowRecord.revisions.at(-1)?.revision ?? 0
     };
   }
 
-  requestUpdate(input: WindowActionInput): WindowSnapshot {
+  async requestUpdate(input: WindowActionInput): Promise<WindowSnapshot> {
     const windowRecord = this.store.getWindow(input.sessionId, input.windowId);
     if (!windowRecord) {
       throw new Error(`Window ${input.sessionId}/${input.windowId} not found`);
@@ -318,11 +381,20 @@ export class WindowOrchestrator {
       input.windowId,
       createContextEntry('user', input.instruction)
     );
+    const generationSelection = await this.resolveWindowGenerationSelection({
+      sessionId: input.sessionId,
+      windowId: input.windowId,
+      appId: windowRecord.appId,
+      title: windowRecord.title,
+      instruction: input.instruction
+    });
+    this.store.setGenerationSelection(input.sessionId, input.windowId, generationSelection);
     this.store.setLoading(input.sessionId, input.windowId);
     this.eventBus.publish({
       type: 'window-status',
       sessionId: input.sessionId,
       windowId: input.windowId,
+      generationSelection,
       status: 'loading'
     });
 
@@ -340,7 +412,11 @@ export class WindowOrchestrator {
     return this.getWindowSnapshot(input.sessionId, input.windowId);
   }
 
-  requestPromptUpdate(input: { sessionId: string; windowId: string; prompt: string }): WindowSnapshot {
+  async requestPromptUpdate(input: {
+    sessionId: string;
+    windowId: string;
+    prompt: string;
+  }): Promise<WindowSnapshot> {
     const windowRecord = this.store.getWindow(input.sessionId, input.windowId);
     if (!windowRecord) {
       throw new Error(`Window ${input.sessionId}/${input.windowId} not found`);
@@ -364,12 +440,21 @@ export class WindowOrchestrator {
         createContextEntry('user', '[Edited generation prompt]')
       );
     }
+    const generationSelection = await this.resolveWindowGenerationSelection({
+      sessionId: input.sessionId,
+      windowId: input.windowId,
+      appId: windowRecord.appId,
+      title: windowRecord.title,
+      instruction: instruction ?? normalizedPrompt
+    });
+    this.store.setGenerationSelection(input.sessionId, input.windowId, generationSelection);
 
     this.store.setLoading(input.sessionId, input.windowId);
     this.eventBus.publish({
       type: 'window-status',
       sessionId: input.sessionId,
       windowId: input.windowId,
+      generationSelection,
       status: 'loading'
     });
 
@@ -388,7 +473,11 @@ export class WindowOrchestrator {
     return this.getWindowSnapshot(input.sessionId, input.windowId);
   }
 
-  regenerateWindowRevision(sessionId: string, windowId: string, targetRevision: number): WindowSnapshot {
+  async regenerateWindowRevision(
+    sessionId: string,
+    windowId: string,
+    targetRevision: number
+  ): Promise<WindowSnapshot> {
     const revision = this.getWindowRevision(sessionId, windowId, targetRevision);
     const prompt = redactPreviousSource(revision.prompt);
     return this.requestPromptUpdate({ sessionId, windowId, prompt });
@@ -423,7 +512,8 @@ export class WindowOrchestrator {
       sessionId: input.sessionId,
       windowId: input.newWindowId,
       appId: sourceRecord.appId,
-      title
+      title,
+      generationSelection: sourceRecord.generationSelection
     });
 
     this.store.addContextEntry(
@@ -470,6 +560,7 @@ export class WindowOrchestrator {
       type: 'window-updated',
       sessionId,
       windowId,
+      generationSelection: this.store.getWindow(sessionId, windowId)?.generationSelection,
       revision: revision.revision,
       strategy: 'remount',
       status: 'ready'
@@ -636,6 +727,7 @@ export class WindowOrchestrator {
         windowId,
         appId: record.appId,
         title: record.title,
+        generationSelection: record.generationSelection,
         revision: revision.revision,
         strategy: strategyResult.strategy,
         status: 'ready'
@@ -659,6 +751,7 @@ export class WindowOrchestrator {
         sessionId,
         windowId,
         appId: record.appId,
+        generationSelection: record.generationSelection,
         status: 'error',
         error: message
       });

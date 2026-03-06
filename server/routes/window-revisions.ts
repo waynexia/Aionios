@@ -83,7 +83,7 @@ export function registerWindowRevisionRoutes(
     }
   });
 
-  app.post('/api/sessions/:sessionId/windows/:windowId/revisions/:revision/regenerate', (request, response) => {
+  app.post('/api/sessions/:sessionId/windows/:windowId/revisions/:revision/regenerate', async (request, response) => {
     const { sessionId, windowId } = request.params;
     const parsedRevision = parsePositiveInteger(request.params.revision);
     if (!parsedRevision) {
@@ -91,11 +91,10 @@ export function registerWindowRevisionRoutes(
       return;
     }
     try {
-      const snapshot = orchestrator.regenerateWindowRevision(sessionId, windowId, parsedRevision);
+      const snapshot = await orchestrator.regenerateWindowRevision(sessionId, windowId, parsedRevision);
       response.status(202).json(snapshot);
     } catch (error) {
       notFound(response, (error as Error).message);
     }
   });
 }
-

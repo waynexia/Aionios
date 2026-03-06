@@ -1,4 +1,7 @@
 import type {
+  ArtifactMetadataKind,
+  ArtifactMetadataSuggestion,
+  GenerationSelection,
   HostFileEntry,
   PersistedAppDescriptor,
   PreferenceConfig,
@@ -58,6 +61,7 @@ export async function openWindow(input: {
   appId: string;
   title: string;
   instruction?: string;
+  generationSelection?: GenerationSelection;
 }) {
   return requestJson<ServerWindowSnapshot>(`/api/sessions/${input.sessionId}/windows/open`, {
     method: 'POST',
@@ -65,7 +69,8 @@ export async function openWindow(input: {
       windowId: input.windowId,
       appId: input.appId,
       title: input.title,
-      instruction: input.instruction
+      instruction: input.instruction,
+      generationSelection: input.generationSelection
     })
   });
 }
@@ -283,13 +288,34 @@ export async function createPersistedApp(input: {
   directory?: string;
   title: string;
   icon?: string;
+  fileName?: string;
 }) {
   return requestJson<PersistedAppDescriptor>('/api/apps', {
     method: 'POST',
     body: JSON.stringify({
       directory: input.directory,
       title: input.title,
-      icon: input.icon
+      icon: input.icon,
+      fileName: input.fileName
+    })
+  });
+}
+
+export async function suggestArtifactMetadata(input: {
+  instruction: string;
+  kind: ArtifactMetadataKind;
+  extension?: string;
+  appId?: string;
+  title?: string;
+}) {
+  return requestJson<ArtifactMetadataSuggestion>('/api/llm/artifact-metadata', {
+    method: 'POST',
+    body: JSON.stringify({
+      instruction: input.instruction,
+      kind: input.kind,
+      extension: input.extension,
+      appId: input.appId,
+      title: input.title
     })
   });
 }

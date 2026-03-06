@@ -4,6 +4,7 @@ import type {
   SessionRecord,
   SourceSnapshot,
   UpdateStrategy,
+  WindowGenerationSelection,
   WindowRecord,
   WindowRevision,
   WindowSnapshot
@@ -47,6 +48,7 @@ export class SessionStore {
       windowId: input.windowId,
       appId: input.appId,
       title: input.title,
+      generationSelection: input.generationSelection,
       status: 'loading',
       createdAt,
       updatedAt: createdAt,
@@ -87,6 +89,7 @@ export class SessionStore {
       windowId: windowRecord.windowId,
       appId: windowRecord.appId,
       title: windowRecord.title,
+      generationSelection: windowRecord.generationSelection,
       status: windowRecord.status,
       revision: windowRecord.revisions.at(-1)?.revision ?? 0,
       error: windowRecord.error
@@ -110,6 +113,16 @@ export class SessionStore {
   setTitle(sessionId: string, windowId: string, title: string) {
     const windowRecord = this.mustGetWindow(sessionId, windowId);
     windowRecord.title = title;
+    windowRecord.updatedAt = nowIso();
+  }
+
+  setGenerationSelection(
+    sessionId: string,
+    windowId: string,
+    generationSelection: WindowGenerationSelection | undefined
+  ) {
+    const windowRecord = this.mustGetWindow(sessionId, windowId);
+    windowRecord.generationSelection = generationSelection;
     windowRecord.updatedAt = nowIso();
   }
 

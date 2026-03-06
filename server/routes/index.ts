@@ -7,6 +7,7 @@ import { TerminalManager } from '../terminal/manager';
 import { registerAppRoutes } from './apps';
 import { registerConfigRoutes } from './config';
 import { registerFileSystemRoutes } from './fs';
+import { registerLlmRoutes } from './llm';
 import { registerRecycleBinRoutes } from './recycle-bin';
 import { registerSessionRoutes } from './sessions';
 import { registerTerminalRoutes } from './terminal';
@@ -25,6 +26,7 @@ export type ApiRouteDeps = {
 export function registerApiRoutes(app: Express, deps: ApiRouteDeps) {
   registerAppRoutes(app, { hostFs: deps.hostFs });
   registerFileSystemRoutes(app, { hostFs: deps.hostFs });
+  registerLlmRoutes(app, { orchestrator: deps.orchestrator });
   registerRecycleBinRoutes(app, { hostFs: deps.hostFs, recycleBinStore: deps.recycleBinStore });
   registerSessionRoutes(app, { orchestrator: deps.orchestrator });
   registerConfigRoutes(app, { preferenceConfigStore: deps.preferenceConfigStore });
@@ -33,4 +35,3 @@ export function registerApiRoutes(app: Express, deps: ApiRouteDeps) {
   registerWindowRoutes(app, { orchestrator: deps.orchestrator, terminalManager: deps.terminalManager });
   registerWindowRevisionRoutes(app, { orchestrator: deps.orchestrator });
 }
-

@@ -554,6 +554,15 @@ body,
   color: rgba(254, 240, 138, 0.86);
 }
 
+.llm-generation__selection-name {
+  max-width: 20ch;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(226, 232, 240, 0.9);
+  text-align: center;
+  text-wrap: balance;
+}
+
 .llm-generation--loading .llm-generation__selection {
   animation: llm-generation-selection-pulse 7s ease-in-out infinite;
 }

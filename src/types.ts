@@ -4,6 +4,18 @@ export type UpdateStrategy = 'hmr' | 'remount';
 
 export type LlmBackend = 'mock' | 'codex';
 
+export type ArtifactMetadataKind = 'window' | 'app' | 'file';
+
+export interface GenerationSelection {
+  emoji: string;
+  fileName: string;
+}
+
+export interface ArtifactMetadataSuggestion extends GenerationSelection {
+  title: string;
+  backend: string;
+}
+
 export type WindowLaunchRequest = { kind: 'open-file'; path: string };
 
 export interface PreferenceConfig {
@@ -38,6 +50,7 @@ export interface DesktopWindow {
   sessionId: string;
   appId: string;
   title: string;
+  generationSelection?: GenerationSelection;
   launch?: WindowLaunchRequest;
   x: number;
   y: number;
@@ -144,6 +157,7 @@ export interface ServerWindowSnapshot {
   windowId: string;
   appId: string;
   title: string;
+  generationSelection?: GenerationSelection;
   status: ClientWindowStatus;
   revision: number;
   error?: string;
@@ -182,6 +196,7 @@ export interface ServerWindowLifecycleEvent {
   windowId: string;
   appId?: string;
   title?: string;
+  generationSelection?: GenerationSelection;
   status?: ClientWindowStatus;
   revision?: number;
   strategy?: UpdateStrategy;

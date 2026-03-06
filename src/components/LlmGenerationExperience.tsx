@@ -6,11 +6,15 @@ const SELECTION_TICK_MS = 1600;
 export interface LlmGenerationExperienceProps {
   title: string;
   phase: 'loading' | 'completing';
+  selectedEmoji?: string;
+  selectedFileName?: string;
 }
 
 export function LlmGenerationExperience({
   title,
-  phase
+  phase,
+  selectedEmoji,
+  selectedFileName
 }: LlmGenerationExperienceProps) {
   const reels = useMemo(() => createEmojiReels(5, 12), []);
   const [selectionEmoji, setSelectionEmoji] = useState(() => getRandomEmoji());
@@ -29,6 +33,16 @@ export function LlmGenerationExperience({
     };
   }, [phase]);
 
+  useEffect(() => {
+    if (phase !== 'completing') {
+      return;
+    }
+    if (!selectedEmoji?.trim()) {
+      return;
+    }
+    setSelectionEmoji(selectedEmoji.trim());
+  }, [phase, selectedEmoji]);
+
   const targetTitle = title.trim() || 'this window';
   const titleLabel =
     phase === 'loading'
@@ -36,6 +50,10 @@ export function LlmGenerationExperience({
       : `Finalizing ${targetTitle}`;
   const statusLabel =
     phase === 'loading' ? 'Scanning Unicode emoji ranges' : 'Selection locked';
+  const resultLabel =
+    phase === 'completing'
+      ? selectedFileName?.trim() || targetTitle
+      : 'Evaluating names and icons';
 
   return (
     <section
@@ -95,6 +113,7 @@ export function LlmGenerationExperience({
           <div className="llm-generation__selection" data-llm-generation-selection>
             <span className="llm-generation__selection-emoji">{selectionEmoji}</span>
             <span className="llm-generation__selection-label">{statusLabel}</span>
+            <span className="llm-generation__selection-name">{resultLabel}</span>
           </div>
         </div>
       </div>

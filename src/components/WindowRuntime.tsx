@@ -138,6 +138,8 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
           key={`${windowItem.windowId}:${loadingCycle}`}
           title={windowItem.title}
           phase={loadingPhase === 'loading' ? 'loading' : 'completing'}
+          selectedEmoji={windowItem.generationSelection?.emoji}
+          selectedFileName={windowItem.generationSelection?.fileName}
         />
       );
     }
@@ -154,6 +156,8 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
         key={`${windowItem.windowId}:${loadingCycle}`}
         title={windowItem.title}
         phase={loadingPhase === 'loading' ? 'loading' : 'completing'}
+        selectedEmoji={windowItem.generationSelection?.emoji}
+        selectedFileName={windowItem.generationSelection?.fileName}
       />
     );
   }

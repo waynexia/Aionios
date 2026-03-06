@@ -19,11 +19,17 @@ export interface WindowRevision {
   backend: string;
 }
 
+export interface WindowGenerationSelection {
+  emoji: string;
+  fileName: string;
+}
+
 export interface WindowRecord {
   sessionId: string;
   windowId: string;
   appId: string;
   title: string;
+  generationSelection?: WindowGenerationSelection;
   status: WindowLifecycleStatus;
   createdAt: string;
   updatedAt: string;
@@ -44,6 +50,7 @@ export interface OpenWindowInput {
   appId: string;
   title: string;
   instruction?: string;
+  generationSelection?: WindowGenerationSelection;
 }
 
 export interface WindowActionInput {
@@ -70,8 +77,30 @@ export interface GenerateResult {
   backend: string;
 }
 
+export type ArtifactMetadataKind = 'window' | 'app' | 'file';
+
+export interface SuggestArtifactMetadataRequest {
+  kind: ArtifactMetadataKind;
+  instruction: string;
+  sessionId?: string;
+  windowId?: string;
+  appId?: string;
+  title?: string;
+  extension?: string;
+}
+
+export interface SuggestArtifactMetadataResult {
+  emoji: string;
+  title: string;
+  fileName: string;
+  backend: string;
+}
+
 export interface LlmProvider {
   generate(request: GenerateRequest): Promise<GenerateResult>;
+  suggestArtifactMetadata(
+    request: SuggestArtifactMetadataRequest
+  ): Promise<SuggestArtifactMetadataResult>;
 }
 
 export interface WindowEvent {
@@ -80,6 +109,7 @@ export interface WindowEvent {
   windowId: string;
   title?: string;
   appId?: string;
+  generationSelection?: WindowGenerationSelection;
   status?: WindowLifecycleStatus;
   revision?: number;
   strategy?: UpdateStrategy;
@@ -132,6 +162,7 @@ export interface WindowSnapshot {
   windowId: string;
   appId: string;
   title: string;
+  generationSelection?: WindowGenerationSelection;
   status: WindowLifecycleStatus;
   revision: number;
   error?: string;

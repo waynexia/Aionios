@@ -6,12 +6,13 @@ import {
   openWindow,
   readHostFile,
   requestWindowUpdate,
+  suggestArtifactMetadata,
   trashHostFile,
   writeHostFile
 } from '../api/client';
 import type { AppAction, CanvasDimensions } from '../state/app-state';
 import { windowErrorEvent, windowLifecycleEventFromSnapshot } from '../state/window-events';
-import type { AppDefinition, PersistedAppDescriptor } from '../types';
+import type { AppDefinition, ArtifactMetadataKind, PersistedAppDescriptor } from '../types';
 import { dispatchFsChanged } from '../aionios-events';
 import {
   buildFileOpenWindowTitle,
@@ -21,8 +22,10 @@ import {
 } from '../open-file';
 import {
   buildCreateNewFileContent,
+  deriveFileBaseNameFromSuggestedFileName,
   deriveFileBaseNameFromInstruction,
   deriveWindowTitleFromInstruction,
+  ensureSuggestedFileNameHasExtension,
   inferCreateNewExtension,
   normalizeCreateNewDirectory,
   normalizeCreateNewExtension,
@@ -47,6 +50,39 @@ export function useWindowActions(options: {
     upsertPersistedApp
   } = options;
 
+  const resolveArtifactMetadata = useCallback(
+    async (input: {
+      instruction: string;
+      kind: ArtifactMetadataKind;
+      title: string;
+      fallbackFileName: string;
+      extension?: string;
+      appId?: string;
+      fallbackEmoji?: string;
+    }) => {
+      try {
+        return await suggestArtifactMetadata({
+          instruction: input.instruction,
+          kind: input.kind,
+          extension: input.extension,
+          appId: input.appId,
+          title: input.title
+        });
+      } catch (error) {
+        console.warn('[aionios] unable to suggest artifact metadata, using fallback', error);
+        return {
+          title: input.title,
+          fileName: input.extension
+            ? ensureSuggestedFileNameHasExtension(input.fallbackFileName, input.extension)
+            : input.fallbackFileName,
+          emoji: input.fallbackEmoji ?? '🧩',
+          backend: 'fallback'
+        };
+      }
+    },
+    []
+  );
+
   const openGeneratedWindow = useCallback(
     async (input: {
       windowId: string;
@@ -54,6 +90,7 @@ export function useWindowActions(options: {
       title: string;
       instruction?: string;
       canvas: CanvasDimensions | undefined;
+      generationSelection?: { emoji: string; fileName: string };
     }) => {
       if (!sessionId) {
         return;
@@ -65,6 +102,7 @@ export function useWindowActions(options: {
         sessionId,
         appId: input.appId,
         title: input.title,
+        generationSelection: input.generationSelection,
         canvas: input.canvas
       });
 
@@ -74,7 +112,8 @@ export function useWindowActions(options: {
           windowId: input.windowId,
           appId: input.appId,
           title: input.title,
-          instruction: input.instruction
+          instruction: input.instruction,
+          generationSelection: input.generationSelection
         });
         dispatch({
           type: 'window-server-event',
@@ -172,18 +211,36 @@ export function useWindowActions(options: {
         return;
       }
 
+      const metadata = normalizedInstruction
+        ? await resolveArtifactMetadata({
+            instruction: normalizedInstruction,
+            kind: 'window',
+            title,
+            appId,
+            fallbackFileName: deriveWindowTitleFromInstruction(normalizedInstruction),
+            fallbackEmoji: definition?.icon
+          })
+        : null;
+
       await openGeneratedWindow({
         windowId,
         appId,
         title,
         instruction: normalizedInstruction,
-        canvas
+        canvas,
+        generationSelection: metadata
+          ? {
+              emoji: metadata.emoji,
+              fileName: metadata.fileName
+            }
+          : undefined
       });
     },
     [
       getWindowCanvasDimensions,
       openGeneratedWindow,
       openSystemWindow,
+      resolveArtifactMetadata,
       resolveAppDefinition,
       sessionId
     ]
@@ -239,7 +296,18 @@ export function useWindowActions(options: {
       if (extension !== '.app') {
         const normalizedDirectory = normalizeCreateNewDirectory(directory);
         const directoryForEvent = normalizedDirectory.length > 0 ? normalizedDirectory : '/';
-        const title = deriveFileBaseNameFromInstruction(instruction, extension);
+        const fallbackTitle = deriveWindowTitleFromInstruction(instruction);
+        const fallbackBaseName = deriveFileBaseNameFromInstruction(instruction, extension);
+        const metadata = await resolveArtifactMetadata({
+          instruction,
+          kind: 'file',
+          title: fallbackTitle,
+          extension,
+          fallbackFileName: fallbackBaseName,
+          fallbackEmoji: '📄'
+        });
+        const title = metadata.title;
+        const baseName = deriveFileBaseNameFromSuggestedFileName(metadata.fileName, extension);
         let existingPaths = new Set<string>();
         try {
           const { files } = await listHostFiles();
@@ -253,7 +321,7 @@ export function useWindowActions(options: {
           virtualPath = pickUniqueVirtualPath({
             existingPaths,
             directory: normalizedDirectory,
-            baseName: title,
+            baseName,
             extension
           });
         } catch (error) {
@@ -274,14 +342,25 @@ export function useWindowActions(options: {
 
       const normalizedInstruction = instruction.trim() ? instruction.trim() : undefined;
       const windowId = randomWindowId();
-      const title = deriveWindowTitleFromInstruction(instruction);
+      const fallbackTitle = deriveWindowTitleFromInstruction(instruction);
+      const metadata = await resolveArtifactMetadata({
+        instruction,
+        kind: 'app',
+        title: fallbackTitle,
+        extension: '.app',
+        fallbackFileName: fallbackTitle,
+        fallbackEmoji: '🧩'
+      });
+      const title = metadata.title;
       const canvas = getWindowCanvasDimensions();
 
       let descriptor: PersistedAppDescriptor | null = null;
       try {
         descriptor = await createPersistedApp({
           directory,
-          title
+          title,
+          icon: metadata.emoji,
+          fileName: metadata.fileName
         });
         upsertPersistedApp(descriptor);
         await refreshPersistedApps();
@@ -296,7 +375,11 @@ export function useWindowActions(options: {
         appId,
         title: resolvedTitle,
         instruction: normalizedInstruction,
-        canvas
+        canvas,
+        generationSelection: {
+          emoji: metadata.emoji,
+          fileName: metadata.fileName
+        }
       });
     },
     [
@@ -304,6 +387,7 @@ export function useWindowActions(options: {
       openFile,
       openGeneratedWindow,
       refreshPersistedApps,
+      resolveArtifactMetadata,
       sessionId,
       upsertPersistedApp
     ]
@@ -328,6 +412,7 @@ export function useWindowActions(options: {
         sessionId: snapshot.sessionId,
         appId: snapshot.appId,
         title: snapshot.title,
+        generationSelection: snapshot.generationSelection,
         initialStatus: snapshot.status,
         initialRevision: snapshot.revision,
         initialError: snapshot.error,

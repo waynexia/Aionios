@@ -26,10 +26,11 @@ export function registerAppRoutes(app: Express, deps: { hostFs: HostFileSystem }
   });
 
   app.post('/api/apps', async (request, response) => {
-    const { directory, title, icon } = request.body as {
+    const { directory, title, icon, fileName } = request.body as {
       directory?: unknown;
       title?: unknown;
       icon?: unknown;
+      fileName?: unknown;
     };
     if (directory !== undefined && typeof directory !== 'string') {
       badRequest(response, 'directory must be a string when provided.');
@@ -44,6 +45,10 @@ export function registerAppRoutes(app: Express, deps: { hostFs: HostFileSystem }
       badRequest(response, 'icon must be a string when provided.');
       return;
     }
+    if (fileName !== undefined && typeof fileName !== 'string') {
+      badRequest(response, 'fileName must be a string when provided.');
+      return;
+    }
 
     const appId = `app-${nanoid(10)}`;
     try {
@@ -51,7 +56,8 @@ export function registerAppRoutes(app: Express, deps: { hostFs: HostFileSystem }
         directory,
         appId,
         title: parsedTitle.trim(),
-        icon
+        icon,
+        fileName: typeof fileName === 'string' ? fileName : undefined
       });
       response.status(201).json(descriptor);
     } catch (error) {
@@ -59,4 +65,3 @@ export function registerAppRoutes(app: Express, deps: { hostFs: HostFileSystem }
     }
   });
 }
-

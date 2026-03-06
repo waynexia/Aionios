@@ -11,7 +11,7 @@ export function registerWindowActionRoutes(
 ) {
   const { orchestrator } = deps;
 
-  app.post('/api/sessions/:sessionId/windows/:windowId/actions', (request, response) => {
+  app.post('/api/sessions/:sessionId/windows/:windowId/actions', async (request, response) => {
     const { sessionId, windowId } = request.params;
     const { instruction } = request.body as { instruction?: string };
     if (!instruction) {
@@ -19,7 +19,7 @@ export function registerWindowActionRoutes(
       return;
     }
     try {
-      const snapshot = orchestrator.requestUpdate({
+      const snapshot = await orchestrator.requestUpdate({
         sessionId,
         windowId,
         instruction
@@ -30,7 +30,7 @@ export function registerWindowActionRoutes(
     }
   });
 
-  app.post('/api/sessions/:sessionId/windows/:windowId/actions/prompt', (request, response) => {
+  app.post('/api/sessions/:sessionId/windows/:windowId/actions/prompt', async (request, response) => {
     const { sessionId, windowId } = request.params;
     const { prompt: promptValue } = request.body as { prompt?: string };
     const prompt = parseNonEmptyString(promptValue);
@@ -39,7 +39,7 @@ export function registerWindowActionRoutes(
       return;
     }
     try {
-      const snapshot = orchestrator.requestPromptUpdate({
+      const snapshot = await orchestrator.requestPromptUpdate({
         sessionId,
         windowId,
         prompt
@@ -50,4 +50,3 @@ export function registerWindowActionRoutes(
     }
   });
 }
-

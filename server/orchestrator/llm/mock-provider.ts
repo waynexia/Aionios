@@ -1,4 +1,11 @@
-import type { GenerateRequest, GenerateResult, LlmProvider } from '../types';
+import type {
+  GenerateRequest,
+  GenerateResult,
+  LlmProvider,
+  SuggestArtifactMetadataRequest,
+  SuggestArtifactMetadataResult
+} from '../types';
+import { buildFallbackArtifactMetadata } from './metadata';
 
 function escapeText(value: string) {
   return value.replaceAll('\\', '\\\\').replaceAll('`', '\\`');
@@ -114,6 +121,15 @@ export class MockLlmProvider implements LlmProvider {
   async generate(request: GenerateRequest): Promise<GenerateResult> {
     return {
       source: buildMockSource(request),
+      backend: 'mock'
+    };
+  }
+
+  async suggestArtifactMetadata(
+    request: SuggestArtifactMetadataRequest
+  ): Promise<SuggestArtifactMetadataResult> {
+    return {
+      ...buildFallbackArtifactMetadata(request),
       backend: 'mock'
     };
   }

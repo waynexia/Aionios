@@ -13,13 +13,15 @@ export default function WindowApp() {
 }
 `.trim();
 
-const { generateMock } = vi.hoisted(() => ({
-  generateMock: vi.fn()
+const { generateMock, suggestArtifactMetadataMock } = vi.hoisted(() => ({
+  generateMock: vi.fn(),
+  suggestArtifactMetadataMock: vi.fn()
 }));
 
 vi.mock('./llm/provider', () => ({
   createLlmProvider: () => ({
-    generate: generateMock
+    generate: generateMock,
+    suggestArtifactMetadata: suggestArtifactMetadataMock
   })
 }));
 
@@ -98,8 +100,15 @@ async function waitForPersistedRevision(
 describe('WindowOrchestrator', () => {
   beforeEach(() => {
     generateMock.mockReset();
+    suggestArtifactMetadataMock.mockReset();
     generateMock.mockResolvedValue({
       source: validGeneratedSource,
+      backend: 'mock'
+    });
+    suggestArtifactMetadataMock.mockResolvedValue({
+      emoji: '🧠',
+      title: 'Focus Board',
+      fileName: 'focus-board',
       backend: 'mock'
     });
   });
@@ -132,7 +141,7 @@ describe('WindowOrchestrator', () => {
       title: 'Preference'
     });
 
-    const snapshot = orchestrator.requestUpdate({
+    const snapshot = await orchestrator.requestUpdate({
       sessionId,
       windowId: 'window-system-preference',
       instruction: 'Should be ignored'
@@ -154,6 +163,25 @@ describe('WindowOrchestrator', () => {
 
     expect(snapshot.status).toBe('loading');
     expect(snapshot.revision).toBe(0);
+  });
+
+  it('stores generation selection metadata for prompted llm windows', async () => {
+    const orchestrator = createOrchestrator();
+    const sessionId = orchestrator.createSession();
+
+    const snapshot = await orchestrator.openWindow({
+      sessionId,
+      windowId: 'window-selection',
+      appId: 'notes',
+      title: 'Notes',
+      instruction: 'Build a focus board with timers.'
+    });
+
+    expect(snapshot.generationSelection).toEqual({
+      emoji: '🧠',
+      fileName: 'focus-board'
+    });
+    expect(suggestArtifactMetadataMock).toHaveBeenCalledTimes(1);
   });
 
   it('loads persisted app source when available', async () => {
@@ -288,7 +316,7 @@ describe('WindowOrchestrator', () => {
     });
     await waitForRevision(orchestrator, sessionId, windowId, 1);
 
-    orchestrator.requestUpdate({
+    await orchestrator.requestUpdate({
       sessionId,
       windowId,
       instruction: 'Update instruction'
@@ -350,7 +378,7 @@ describe('WindowOrchestrator', () => {
     });
     await waitForRevision(orchestrator, sessionId, windowId, 1);
 
-    orchestrator.requestUpdate({
+    await orchestrator.requestUpdate({
       sessionId,
       windowId,
       instruction: 'Update instruction'
@@ -366,7 +394,7 @@ describe('WindowOrchestrator', () => {
     const revisionTwoPrompt = orchestrator.getWindowRevisionPrompt(sessionId, windowId, 2);
     const editedPrompt = revisionTwoPrompt.prompt.replace('Update instruction', 'Edited instruction');
 
-    orchestrator.requestPromptUpdate({
+    await orchestrator.requestPromptUpdate({
       sessionId,
       windowId,
       prompt: editedPrompt
@@ -425,7 +453,7 @@ describe('WindowOrchestrator', () => {
     });
     await waitForRevision(orchestrator, sessionId, windowId, 1);
 
-    orchestrator.requestUpdate({
+    await orchestrator.requestUpdate({
       sessionId,
       windowId,
       instruction: 'Update instruction'
@@ -487,7 +515,7 @@ export default function WindowApp() {
     });
     await waitForRevision(orchestrator, sessionId, windowId, 1);
 
-    orchestrator.requestUpdate({
+    await orchestrator.requestUpdate({
       sessionId,
       windowId,
       instruction: 'Update instruction'
@@ -559,7 +587,7 @@ export default function WindowApp() {
     });
     await waitForRevision(orchestrator, sessionId, windowId, 1);
 
-    orchestrator.requestUpdate({
+    await orchestrator.requestUpdate({
       sessionId,
       windowId,
       instruction: 'Update instruction'
@@ -572,7 +600,7 @@ export default function WindowApp() {
     });
     await waitForRevision(orchestrator, sessionId, windowId, 2);
 
-    orchestrator.regenerateWindowRevision(sessionId, windowId, 1);
+    await orchestrator.regenerateWindowRevision(sessionId, windowId, 1);
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 

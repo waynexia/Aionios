@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCreateNewFileContent,
   deriveFileBaseNameFromInstruction,
+  deriveFileBaseNameFromSuggestedFileName,
   deriveWindowTitleFromInstruction,
+  ensureSuggestedFileNameHasExtension,
   inferCreateNewExtension,
   normalizeCreateNewDirectory,
   normalizeCreateNewExtension,
@@ -46,6 +48,10 @@ describe('create-new helpers', () => {
       deriveFileBaseNameFromInstruction('  build <hello>/world:demo?*  ', '.txt')
     ).toBe('build -hello--world-demo--');
     expect(deriveFileBaseNameFromInstruction('', '.json')).toBe('data');
+    expect(deriveFileBaseNameFromSuggestedFileName('projects/Focus Board.app', '.app')).toBe(
+      'Focus Board'
+    );
+    expect(ensureSuggestedFileNameHasExtension('Focus Board', '.app')).toBe('Focus Board.app');
   });
 
   it('builds file templates for structured file types', () => {

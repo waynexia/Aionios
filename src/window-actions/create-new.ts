@@ -67,6 +67,30 @@ export function deriveFileBaseNameFromInstruction(instruction: string, extension
   return bounded.length > 0 ? bounded : fallback;
 }
 
+export function deriveFileBaseNameFromSuggestedFileName(fileName: string, extension: string) {
+  const normalizedExtension = normalizeCreateNewExtension(extension);
+  const trimmed = fileName.replaceAll('\\', '/').trim();
+  const leaf = trimmed.split('/').at(-1) ?? '';
+  const withoutMatchingExtension = leaf.toLowerCase().endsWith(normalizedExtension)
+    ? leaf.slice(0, -normalizedExtension.length)
+    : leaf;
+  const withoutOtherExtension = withoutMatchingExtension.replace(/\.[^.]+$/u, '');
+  const collapsed = withoutOtherExtension.replace(/\s+/g, ' ').trim();
+  const replacedSlashes = collapsed.replaceAll('/', '-').replaceAll('\\', '-');
+  const withoutControl = stripControlCharacters(replacedSlashes);
+  const withoutReserved = withoutControl.replace(/[<>:"|?*]/g, '-');
+  const maxLength = 42;
+  const bounded =
+    withoutReserved.length > maxLength ? withoutReserved.slice(0, maxLength).trim() : withoutReserved;
+  return bounded.length > 0 ? bounded : fallbackBaseNameForExtension(normalizedExtension);
+}
+
+export function ensureSuggestedFileNameHasExtension(fileName: string, extension: string) {
+  const normalizedExtension = normalizeCreateNewExtension(extension);
+  const baseName = deriveFileBaseNameFromSuggestedFileName(fileName, normalizedExtension);
+  return `${baseName}${normalizedExtension}`;
+}
+
 export function normalizeCreateNewExtension(extension: string) {
   const trimmed = extension.trim();
   if (!trimmed) {

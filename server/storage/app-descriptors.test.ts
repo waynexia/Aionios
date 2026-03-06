@@ -41,4 +41,18 @@ describe('app descriptors', () => {
     const toolsOnly = await listAppDescriptors(hostFs, { directory: '/tools' });
     expect(toolsOnly.map((entry) => entry.appId)).toEqual(['app-tools']);
   });
+
+  it('uses the suggested file name when creating an app descriptor path', async () => {
+    const hostFs = await createHostFs();
+    const descriptor = await createAppDescriptor(hostFs, {
+      directory: '/',
+      appId: 'app-focus-board',
+      title: 'Focus Board',
+      icon: '🧠',
+      fileName: 'focus-board.app'
+    });
+
+    expect(descriptor.path).toBe('focus-board.app');
+    expect(descriptor.icon).toBe('🧠');
+  });
 });

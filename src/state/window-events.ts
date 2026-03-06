@@ -15,6 +15,7 @@ export function windowLifecycleEventFromSnapshot(
     windowId: snapshot.windowId,
     appId: snapshot.appId,
     title: snapshot.title,
+    generationSelection: snapshot.generationSelection,
     status: snapshot.status,
     revision: snapshot.revision,
     strategy,
@@ -30,4 +31,3 @@ export function windowErrorEvent(input: { sessionId: string; windowId: string; e
     error: input.error
   };
 }
-
