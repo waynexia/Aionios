@@ -7,6 +7,11 @@ export interface HostFileEntry {
   updatedAt: string;
 }
 
+export interface HostFileMetadata {
+  path: string;
+  updatedAt: string;
+}
+
 function normalizeVirtualPath(input: string): string {
   const trimmed = input.replaceAll('\\', '/').trim();
   const withoutPrefix = trimmed.startsWith('./') ? trimmed.slice(2) : trimmed;
@@ -52,6 +57,10 @@ async function listFilesRecursive(
     }
   }
   return files;
+}
+
+function toVirtualPath(relativePath: string) {
+  return relativePath.split(path.sep).join('/');
 }
 
 export class HostFileSystem {
@@ -104,13 +113,36 @@ export class HostFileSystem {
           fs.readFile(entry.absolutePath, 'utf8'),
           fs.stat(entry.absolutePath)
         ]);
-        const virtualPath = entry.relativePath.split(path.sep).join('/');
+        const virtualPath = toVirtualPath(entry.relativePath);
         entries.push({
           path: virtualPath,
           content,
           updatedAt: stat.mtime.toISOString()
         });
       }
+      entries.sort((left, right) => left.path.localeCompare(right.path, 'en-US'));
+      return entries;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  async listFileMetadata(): Promise<HostFileMetadata[]> {
+    const resolvedRoot = path.resolve(this.options.rootDir);
+    try {
+      const listed = await listFilesRecursive(resolvedRoot, resolvedRoot);
+      const entries = await Promise.all(
+        listed.map(async (entry) => {
+          const stat = await fs.stat(entry.absolutePath);
+          return {
+            path: toVirtualPath(entry.relativePath),
+            updatedAt: stat.mtime.toISOString()
+          };
+        })
+      );
       entries.sort((left, right) => left.path.localeCompare(right.path, 'en-US'));
       return entries;
     } catch (error) {
@@ -156,4 +188,3 @@ export class HostFileSystem {
     throw new Error('Unable to pick a unique file name.');
   }
 }
-

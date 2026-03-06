@@ -106,14 +106,14 @@ function parseDescriptor(content: string): AppDescriptorV1 | null {
 export async function listAppDescriptors(hostFs: HostFileSystem, input?: { directory?: string }) {
   const hasDirectoryFilter = Object.prototype.hasOwnProperty.call(input ?? {}, 'directory');
   const targetDirectory = hasDirectoryFilter ? hostFs.normalizeDir(input?.directory) : null;
-  const files = await hostFs.listFiles();
+  const files = await hostFs.listFileMetadata();
   const descriptors: PersistedAppDescriptor[] = [];
 
   for (const file of files) {
     if (!isAppDescriptorPath(file.path)) {
       continue;
     }
-    const parsed = parseDescriptor(file.content);
+    const parsed = parseDescriptor(await hostFs.readFile(file.path));
     if (!parsed) {
       continue;
     }
