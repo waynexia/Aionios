@@ -350,6 +350,140 @@ describe('WindowOrchestrator', () => {
     expect(revisionTwoPrompt.prompt).not.toContain('Ready');
   });
 
+  it('moves the active head across saved revisions without discarding history', async () => {
+    const orchestrator = createOrchestrator();
+    const sessionId = orchestrator.createSession();
+    const windowId = 'window-llm-notes';
+    const initialDeferred = createDeferred<{ source: string; backend: string }>();
+    const updateDeferred = createDeferred<{ source: string; backend: string }>();
+
+    const updatedGeneratedSource = `
+import React from 'react';
+
+export default function WindowApp() {
+  return <div>Updated</div>;
+}
+`.trim();
+
+    generateMock
+      .mockReturnValueOnce(initialDeferred.promise)
+      .mockReturnValueOnce(updateDeferred.promise);
+
+    await orchestrator.openWindow({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      instruction: 'Initial instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    initialDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 1);
+
+    await orchestrator.requestUpdate({
+      sessionId,
+      windowId,
+      instruction: 'Update instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    updateDeferred.resolve({
+      source: updatedGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 2);
+
+    const rolledBackSnapshot = await orchestrator.rollbackWindow(sessionId, windowId, 1);
+    expect(rolledBackSnapshot.revision).toBe(1);
+    expect(orchestrator.listWindowRevisions(sessionId, windowId)).toHaveLength(2);
+    expect(orchestrator.getWindowModuleSource(sessionId, windowId)).toEqual({
+      revision: 1,
+      source: validGeneratedSource
+    });
+
+    const restoredSnapshot = await orchestrator.rollbackWindow(sessionId, windowId, 2);
+    expect(restoredSnapshot.revision).toBe(2);
+    expect(orchestrator.listWindowRevisions(sessionId, windowId)).toHaveLength(2);
+    expect(orchestrator.getWindowModuleSource(sessionId, windowId)).toEqual({
+      revision: 2,
+      source: updatedGeneratedSource
+    });
+  });
+
+  it('generates from the current head after switching revisions', async () => {
+    const orchestrator = createOrchestrator();
+    const sessionId = orchestrator.createSession();
+    const windowId = 'window-llm-notes';
+    const initialDeferred = createDeferred<{ source: string; backend: string }>();
+    const updateDeferred = createDeferred<{ source: string; backend: string }>();
+    const regenerateDeferred = createDeferred<{ source: string; backend: string }>();
+
+    const updatedGeneratedSource = `
+import React from 'react';
+
+export default function WindowApp() {
+  return <div>Updated</div>;
+}
+`.trim();
+
+    generateMock
+      .mockReturnValueOnce(initialDeferred.promise)
+      .mockReturnValueOnce(updateDeferred.promise)
+      .mockReturnValueOnce(regenerateDeferred.promise);
+
+    await orchestrator.openWindow({
+      sessionId,
+      windowId,
+      appId: 'notes',
+      title: 'Notes',
+      instruction: 'Initial instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    initialDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 1);
+
+    await orchestrator.requestUpdate({
+      sessionId,
+      windowId,
+      instruction: 'Update instruction'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    updateDeferred.resolve({
+      source: updatedGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 2);
+
+    await orchestrator.rollbackWindow(sessionId, windowId, 1);
+
+    await orchestrator.requestUpdate({
+      sessionId,
+      windowId,
+      instruction: 'Generate from rolled-back head'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(generateMock).toHaveBeenCalledTimes(3);
+    expect(generateMock.mock.calls[2]?.[0]?.previousSource).toBe(validGeneratedSource);
+    expect(generateMock.mock.calls[2]?.[0]?.previousSource).not.toBe(updatedGeneratedSource);
+
+    regenerateDeferred.resolve({
+      source: validGeneratedSource,
+      backend: 'mock'
+    });
+    await waitForRevision(orchestrator, sessionId, windowId, 3);
+  });
+
   it('supports regenerating via edited prompt overrides', async () => {
     const orchestrator = createOrchestrator();
     const sessionId = orchestrator.createSession();

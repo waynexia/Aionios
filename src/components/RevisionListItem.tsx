@@ -96,7 +96,7 @@ export function RevisionListItem({
             onRollbackRevision(revision.revision);
           }}
         >
-          {rollingBackTo === revision.revision ? 'Rolling back...' : 'Rollback'}
+          {rollingBackTo === revision.revision ? 'Switching...' : 'Use revision'}
         </button>
       </div>
     </article>

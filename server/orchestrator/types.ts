@@ -35,6 +35,7 @@ export interface WindowRecord {
   updatedAt: string;
   error?: string;
   revisions: WindowRevision[];
+  headRevision: number | null;
   context: ContextEntry[];
 }
 

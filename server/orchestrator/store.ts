@@ -53,6 +53,7 @@ export class SessionStore {
       createdAt,
       updatedAt: createdAt,
       revisions: [],
+      headRevision: null,
       context: []
     };
     session.windows.set(windowRecord.windowId, windowRecord);
@@ -91,7 +92,7 @@ export class SessionStore {
       title: windowRecord.title,
       generationSelection: windowRecord.generationSelection,
       status: windowRecord.status,
-      revision: windowRecord.revisions.at(-1)?.revision ?? 0,
+      revision: this.getCurrentRevisionForRecord(windowRecord)?.revision ?? 0,
       error: windowRecord.error
     }));
   }
@@ -154,6 +155,7 @@ export class SessionStore {
       generatedAt: nowIso()
     };
     windowRecord.revisions.push(revision);
+    windowRecord.headRevision = revision.revision;
     windowRecord.status = 'ready';
     windowRecord.error = undefined;
     windowRecord.updatedAt = revision.generatedAt;
@@ -163,32 +165,35 @@ export class SessionStore {
   loadRevision(sessionId: string, windowId: string, revision: WindowRevision) {
     const windowRecord = this.mustGetWindow(sessionId, windowId);
     windowRecord.revisions = [revision];
+    windowRecord.headRevision = revision.revision;
     windowRecord.status = 'ready';
     windowRecord.error = undefined;
     windowRecord.updatedAt = revision.generatedAt;
   }
 
-  rollbackToRevision(sessionId: string, windowId: string, targetRevision: number) {
+  moveHeadToRevision(sessionId: string, windowId: string, targetRevision: number) {
     const windowRecord = this.mustGetWindow(sessionId, windowId);
-    const revision = windowRecord.revisions.find((entry) => entry.revision === targetRevision);
+    const revision = this.findRevision(windowRecord, targetRevision);
     if (!revision) {
       throw new Error(`Revision ${targetRevision} not found`);
     }
-    windowRecord.revisions = windowRecord.revisions.filter(
-      (entry) => entry.revision <= targetRevision
-    );
+    windowRecord.headRevision = revision.revision;
     windowRecord.status = 'ready';
     windowRecord.error = undefined;
     windowRecord.updatedAt = nowIso();
     return revision;
   }
 
-  getWindowSource(sessionId: string, windowId: string): SourceSnapshot | undefined {
+  getCurrentRevision(sessionId: string, windowId: string): WindowRevision | undefined {
     const windowRecord = this.getWindow(sessionId, windowId);
     if (!windowRecord) {
       return undefined;
     }
-    const revision = windowRecord.revisions.at(-1);
+    return this.getCurrentRevisionForRecord(windowRecord);
+  }
+
+  getWindowSource(sessionId: string, windowId: string): SourceSnapshot | undefined {
+    const revision = this.getCurrentRevision(sessionId, windowId);
     if (!revision) {
       return undefined;
     }
@@ -204,5 +209,17 @@ export class SessionStore {
       throw new Error(`Window ${sessionId}/${windowId} does not exist`);
     }
     return windowRecord;
+  }
+
+  private findRevision(windowRecord: WindowRecord, targetRevision: number) {
+    return windowRecord.revisions.find((entry) => entry.revision === targetRevision);
+  }
+
+  private getCurrentRevisionForRecord(windowRecord: WindowRecord): WindowRevision | undefined {
+    const headRevision = windowRecord.headRevision ?? windowRecord.revisions.at(-1)?.revision;
+    if (typeof headRevision !== 'number') {
+      return undefined;
+    }
+    return this.findRevision(windowRecord, headRevision);
   }
 }

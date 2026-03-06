@@ -222,8 +222,9 @@ export function RevisionDialog({
         </header>
 
         <p className="revision-dialog__description">
-          Roll back to a previous revision. This will discard later revisions.
-          {windowIsLoading ? ' Rollback is disabled while this window is updating.' : null}
+          Switch the current window head to any saved revision. History is preserved, so you can
+          switch back later.
+          {windowIsLoading ? ' Revision switching is disabled while this window is updating.' : null}
         </p>
 
         <section className="revision-dialog__list" data-revision-dialog-list>

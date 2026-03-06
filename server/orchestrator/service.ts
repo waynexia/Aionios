@@ -73,8 +73,7 @@ export class WindowOrchestrator {
 
     const snapshots = this.listWindows(sessionId);
     for (const snapshot of snapshots) {
-      const record = this.store.getWindow(sessionId, snapshot.windowId);
-      const strategy = record?.revisions.at(-1)?.strategy;
+      const strategy = this.store.getCurrentRevision(sessionId, snapshot.windowId)?.strategy;
       const event: SessionEvent = {
         type:
           snapshot.status === 'ready'
@@ -122,7 +121,7 @@ export class WindowOrchestrator {
       title: record.title,
       generationSelection: record.generationSelection,
       status: record.status,
-      revision: record.revisions.at(-1)?.revision ?? 0,
+      revision: this.store.getCurrentRevision(sessionId, windowId)?.revision ?? 0,
       error: record.error
     };
   }
@@ -364,7 +363,7 @@ export class WindowOrchestrator {
       title: windowRecord.title,
       generationSelection: windowRecord.generationSelection,
       status: windowRecord.status,
-      revision: windowRecord.revisions.at(-1)?.revision ?? 0
+      revision: this.store.getCurrentRevision(input.sessionId, input.windowId)?.revision ?? 0
     };
   }
 
@@ -545,7 +544,7 @@ export class WindowOrchestrator {
 
   async rollbackWindow(sessionId: string, windowId: string, targetRevision: number) {
     this.bumpRollbackBarrier(sessionId, windowId);
-    const revision = this.store.rollbackToRevision(sessionId, windowId, targetRevision);
+    const revision = this.store.moveHeadToRevision(sessionId, windowId, targetRevision);
     if (this.moduleBridge) {
       await this.moduleBridge.pushWindowUpdate(sessionId, windowId, 'remount');
     }
@@ -621,7 +620,7 @@ export class WindowOrchestrator {
       return;
     }
 
-    const previousSource = record.revisions.at(-1)?.source;
+    const previousSource = this.store.getCurrentRevision(sessionId, windowId)?.source;
     const hydratedPromptOverride =
       typeof promptOverride === 'string' && promptOverride.trim().length > 0
         ? hydrateRedactedPreviousSource(promptOverride, previousSource)

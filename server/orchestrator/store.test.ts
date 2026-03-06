@@ -15,7 +15,7 @@ function createStoreWithWindow() {
 }
 
 describe('SessionStore', () => {
-  it('tracks revisions and rollback per window', () => {
+  it('tracks revisions and moves the active head without discarding history', () => {
     const store = createStoreWithWindow();
     const revisionOne = store.addRevision(
       'session-a',
@@ -41,12 +41,21 @@ describe('SessionStore', () => {
       source: 'source-two'
     });
 
-    const rolled = store.rollbackToRevision('session-a', 'window-1', 1);
+    const rolled = store.moveHeadToRevision('session-a', 'window-1', 1);
     expect(rolled.revision).toBe(1);
     expect(store.getWindowSource('session-a', 'window-1')).toEqual({
       revision: 1,
       source: 'source-one'
     });
+    expect(store.getWindow('session-a', 'window-1')?.revisions).toHaveLength(2);
+
+    const restored = store.moveHeadToRevision('session-a', 'window-1', 2);
+    expect(restored.revision).toBe(2);
+    expect(store.getWindowSource('session-a', 'window-1')).toEqual({
+      revision: 2,
+      source: 'source-two'
+    });
+    expect(store.getWindow('session-a', 'window-1')?.revisions).toHaveLength(2);
   });
 
   it('caps context entries to 30 records', () => {
