@@ -17,6 +17,9 @@ import type {
   WindowModuleProps
 } from '../types';
 import { ErrorBoundary } from './ErrorBoundary';
+import { LlmGenerationExperience } from './LlmGenerationExperience';
+
+const LLM_LOADING_EXIT_MS = 680;
 
 interface WindowRuntimeProps {
   windowItem: DesktopWindow;
@@ -34,10 +37,51 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
   const loadedRevisionRef = useRef(0);
   const isSystemApp = getAppDefinition(windowItem.appId)?.kind === 'system';
   const hmrSupported = Boolean(import.meta.hot);
+  const isLlmLoading = !isSystemApp && windowItem.status === 'loading';
+  const [loadingPhase, setLoadingPhase] = useState<'hidden' | 'loading' | 'completing'>(
+    isLlmLoading ? 'loading' : 'hidden'
+  );
+  const [loadingCycle, setLoadingCycle] = useState(() => (isLlmLoading ? 1 : 0));
+  const loadingExitTimerRef = useRef<number | null>(null);
+  const wasLlmLoadingRef = useRef(isLlmLoading);
   const moduleId = useMemo(
     () => getWindowModuleId(windowItem.sessionId, windowItem.windowId),
     [windowItem.sessionId, windowItem.windowId]
   );
+
+  useEffect(() => {
+    return () => {
+      if (loadingExitTimerRef.current !== null) {
+        window.clearTimeout(loadingExitTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const wasLoading = wasLlmLoadingRef.current;
+
+    if (isLlmLoading) {
+      if (loadingExitTimerRef.current !== null) {
+        window.clearTimeout(loadingExitTimerRef.current);
+        loadingExitTimerRef.current = null;
+      }
+      if (!wasLoading) {
+        setLoadingCycle((current) => current + 1);
+      }
+      setLoadingPhase('loading');
+    } else if (wasLoading) {
+      if (loadingExitTimerRef.current !== null) {
+        window.clearTimeout(loadingExitTimerRef.current);
+      }
+      setLoadingPhase('completing');
+      loadingExitTimerRef.current = window.setTimeout(() => {
+        setLoadingPhase('hidden');
+        loadingExitTimerRef.current = null;
+      }, LLM_LOADING_EXIT_MS);
+    }
+
+    wasLlmLoadingRef.current = isLlmLoading;
+  }, [isLlmLoading]);
 
   useEffect(() => {
     if (windowItem.status !== 'ready') {
@@ -88,10 +132,29 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
   ]);
 
   if (windowItem.status === 'loading') {
+    if (loadingPhase !== 'hidden') {
+      return (
+        <LlmGenerationExperience
+          key={`${windowItem.windowId}:${loadingCycle}`}
+          title={windowItem.title}
+          phase={loadingPhase === 'loading' ? 'loading' : 'completing'}
+        />
+      );
+    }
     return (
       <RuntimeFallback>
         {isSystemApp ? `Opening ${windowItem.title}...` : `Generating ${windowItem.title}...`}
       </RuntimeFallback>
+    );
+  }
+
+  if (loadingPhase !== 'hidden') {
+    return (
+      <LlmGenerationExperience
+        key={`${windowItem.windowId}:${loadingCycle}`}
+        title={windowItem.title}
+        phase={loadingPhase === 'loading' ? 'loading' : 'completing'}
+      />
     );
   }
 
@@ -116,6 +179,7 @@ export function WindowRuntime({ windowItem, hostBridge, terminalState }: WindowR
     >
       <Suspense fallback={<RuntimeFallback>Rendering module...</RuntimeFallback>}>
         <ModuleComponent
+          key={`${windowItem.windowId}:${windowItem.mountNonce}`}
           host={hostBridge}
           windowState={{
             title: windowItem.title,

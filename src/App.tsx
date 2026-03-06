@@ -161,7 +161,7 @@ export default function App() {
 
             return (
               <WindowFrame
-                key={`${windowItem.windowId}:${windowItem.mountNonce}`}
+                key={windowItem.windowId}
                 windowItem={windowItem}
                 showRevision={getAppDefinition(windowItem.appId)?.kind !== 'system'}
                 focused={windowItem.windowId === state.focusedWindowId}
