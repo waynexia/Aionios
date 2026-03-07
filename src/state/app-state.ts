@@ -277,6 +277,7 @@ function applyWindowEvent(state: AppState, event: WindowServerEvent): AppState {
       }
       return {
         ...windowItem,
+        appId: event.appId ?? windowItem.appId,
         title: event.title ?? windowItem.title,
         generationSelection: event.generationSelection ?? windowItem.generationSelection,
         status,

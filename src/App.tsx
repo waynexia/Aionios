@@ -4,7 +4,6 @@ import { APP_CATALOG, getAppDefinition } from './app-catalog';
 import { ContextMenu } from './components/ContextMenu';
 import { DesktopIcons } from './components/DesktopIcons';
 import { DesktopWallpaper } from './components/DesktopWallpaper';
-import { QuickCreate } from './components/QuickCreate';
 import { Taskbar } from './components/Taskbar';
 import { PromptDialog } from './components/PromptDialog';
 import { RevisionDialog } from './components/RevisionDialog';
@@ -24,7 +23,6 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const sessionRef = useRef(state.sessionId);
   const windowCanvasRef = useRef<HTMLElement | null>(null);
-  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [revisionDialog, setRevisionDialog] = useState<
     | { windowId: string; title: string }
     | null
@@ -109,11 +107,10 @@ export default function App() {
     openOpenDialog
   });
 
-  const toggleQuickCreate = useCallback(() => {
+  const openTaskbarCreateDialog = useCallback(() => {
     closeContextMenu();
-    closePromptDialog();
-    setQuickCreateOpen((current) => !current);
-  }, [closeContextMenu, closePromptDialog]);
+    openCreateDialog('/');
+  }, [closeContextMenu, openCreateDialog]);
 
   const orderedWindows = useMemo(
     () => [...state.windows].sort((left, right) => left.zIndex - right.zIndex),
@@ -242,7 +239,7 @@ export default function App() {
       <Taskbar
         windows={orderedWindows}
         focusedWindowId={state.focusedWindowId}
-        onStartClick={toggleQuickCreate}
+        onStartClick={openTaskbarCreateDialog}
         onWindowClick={(windowId) => {
           const target = state.windows.find((windowItem) => windowItem.windowId === windowId);
           if (!target) {
@@ -258,13 +255,6 @@ export default function App() {
             type: 'window-focus',
             windowId
           });
-        }}
-      />
-      <QuickCreate
-        open={quickCreateOpen}
-        onClose={() => setQuickCreateOpen(false)}
-        onConfirm={(instruction) => {
-          void createNewApp(instruction, '/');
         }}
       />
       <ContextMenu

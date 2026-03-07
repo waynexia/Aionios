@@ -86,11 +86,18 @@ export function useWindowActions(options: {
   const openGeneratedWindow = useCallback(
     async (input: {
       windowId: string;
-      appId: string;
-      title: string;
-      instruction?: string;
       canvas: CanvasDimensions | undefined;
-      generationSelection?: { emoji: string; fileName: string };
+      initial: {
+        appId: string;
+        title: string;
+        generationSelection?: { emoji: string; fileName: string };
+      };
+      resolveRequest: () => Promise<{
+        appId: string;
+        title: string;
+        instruction?: string;
+        generationSelection?: { emoji: string; fileName: string };
+      }>;
     }) => {
       if (!sessionId) {
         return;
@@ -100,20 +107,29 @@ export function useWindowActions(options: {
         type: 'window-open-local',
         windowId: input.windowId,
         sessionId,
-        appId: input.appId,
-        title: input.title,
-        generationSelection: input.generationSelection,
+        appId: input.initial.appId,
+        title: input.initial.title,
+        generationSelection: input.initial.generationSelection,
         canvas: input.canvas
       });
 
       try {
+        const request = await input.resolveRequest();
+        dispatch({
+          type: 'window-open-local',
+          windowId: input.windowId,
+          sessionId,
+          appId: request.appId,
+          title: request.title,
+          generationSelection: request.generationSelection
+        });
         const snapshot = await openWindow({
           sessionId,
           windowId: input.windowId,
-          appId: input.appId,
-          title: input.title,
-          instruction: input.instruction,
-          generationSelection: input.generationSelection
+          appId: request.appId,
+          title: request.title,
+          instruction: request.instruction,
+          generationSelection: request.generationSelection
         });
         dispatch({
           type: 'window-server-event',
@@ -201,6 +217,12 @@ export function useWindowActions(options: {
       const isSystemApp = definition?.kind === 'system';
       const canvas = getWindowCanvasDimensions();
       const normalizedInstruction = instruction?.trim() ? instruction.trim() : undefined;
+      const initialGenerationSelection = normalizedInstruction
+        ? {
+            emoji: definition?.icon ?? '🧩',
+            fileName: deriveWindowTitleFromInstruction(normalizedInstruction)
+          }
+        : undefined;
 
       if (isSystemApp) {
         await openSystemWindow({
@@ -211,29 +233,38 @@ export function useWindowActions(options: {
         return;
       }
 
-      const metadata = normalizedInstruction
-        ? await resolveArtifactMetadata({
-            instruction: normalizedInstruction,
-            kind: 'window',
-            title,
-            appId,
-            fallbackFileName: deriveWindowTitleFromInstruction(normalizedInstruction),
-            fallbackEmoji: definition?.icon
-          })
-        : null;
-
       await openGeneratedWindow({
         windowId,
-        appId,
-        title,
-        instruction: normalizedInstruction,
         canvas,
-        generationSelection: metadata
-          ? {
-              emoji: metadata.emoji,
-              fileName: metadata.fileName
-            }
-          : undefined
+        initial: {
+          appId,
+          title,
+          generationSelection: initialGenerationSelection
+        },
+        resolveRequest: async () => {
+          const metadata = normalizedInstruction
+            ? await resolveArtifactMetadata({
+                instruction: normalizedInstruction,
+                kind: 'window',
+                title,
+                appId,
+                fallbackFileName: deriveWindowTitleFromInstruction(normalizedInstruction),
+                fallbackEmoji: definition?.icon
+              })
+            : null;
+
+          return {
+            appId,
+            title: metadata?.title ?? title,
+            instruction: normalizedInstruction,
+            generationSelection: metadata
+              ? {
+                  emoji: metadata.emoji,
+                  fileName: metadata.fileName
+                }
+              : undefined
+          };
+        }
       });
     },
     [
@@ -343,42 +374,55 @@ export function useWindowActions(options: {
       const normalizedInstruction = instruction.trim() ? instruction.trim() : undefined;
       const windowId = randomWindowId();
       const fallbackTitle = deriveWindowTitleFromInstruction(instruction);
-      const metadata = await resolveArtifactMetadata({
-        instruction,
-        kind: 'app',
-        title: fallbackTitle,
-        extension: '.app',
-        fallbackFileName: fallbackTitle,
-        fallbackEmoji: '🧩'
-      });
-      const title = metadata.title;
       const canvas = getWindowCanvasDimensions();
-
-      let descriptor: PersistedAppDescriptor | null = null;
-      try {
-        descriptor = await createPersistedApp({
-          directory,
-          title,
-          icon: metadata.emoji,
-          fileName: metadata.fileName
-        });
-        upsertPersistedApp(descriptor);
-        await refreshPersistedApps();
-      } catch (error) {
-        console.warn('[aionios] unable to persist Create New app, falling back to ephemeral window', error);
-      }
-
-      const appId = descriptor?.appId ?? 'custom';
-      const resolvedTitle = descriptor?.title ?? title;
+      const fallbackFileName = ensureSuggestedFileNameHasExtension(fallbackTitle, '.app');
       await openGeneratedWindow({
         windowId,
-        appId,
-        title: resolvedTitle,
-        instruction: normalizedInstruction,
         canvas,
-        generationSelection: {
-          emoji: metadata.emoji,
-          fileName: metadata.fileName
+        initial: {
+          appId: 'custom',
+          title: fallbackTitle,
+          generationSelection: {
+            emoji: '🧩',
+            fileName: fallbackFileName
+          }
+        },
+        resolveRequest: async () => {
+          const metadata = await resolveArtifactMetadata({
+            instruction,
+            kind: 'app',
+            title: fallbackTitle,
+            extension: '.app',
+            fallbackFileName: fallbackTitle,
+            fallbackEmoji: '🧩'
+          });
+
+          let descriptor: PersistedAppDescriptor | null = null;
+          try {
+            descriptor = await createPersistedApp({
+              directory,
+              title: metadata.title,
+              icon: metadata.emoji,
+              fileName: metadata.fileName
+            });
+            upsertPersistedApp(descriptor);
+            void refreshPersistedApps();
+          } catch (error) {
+            console.warn(
+              '[aionios] unable to persist Create New app, falling back to ephemeral window',
+              error
+            );
+          }
+
+          return {
+            appId: descriptor?.appId ?? 'custom',
+            title: descriptor?.title ?? metadata.title,
+            instruction: normalizedInstruction,
+            generationSelection: {
+              emoji: metadata.emoji,
+              fileName: metadata.fileName
+            }
+          };
         }
       });
     },

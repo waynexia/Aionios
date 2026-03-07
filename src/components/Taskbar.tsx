@@ -52,7 +52,7 @@ export function Taskbar({ windows, focusedWindowId, onStartClick, onWindowClick 
         type="button"
         className="taskbar__start"
         data-taskbar-start
-        aria-label="Quick create"
+        aria-label="Create new"
         onClick={() => {
           onStartClick();
         }}

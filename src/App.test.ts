@@ -189,6 +189,36 @@ describe('window event ordering guard', () => {
       maximized: false
     });
   });
+
+  it('updates an existing loading window when create-new metadata resolves', () => {
+    const opened = buildStateWithWindow();
+
+    const updated = reducer(opened, {
+      type: 'window-open-local',
+      sessionId: 'session-1',
+      windowId: 'window-1',
+      appId: 'app-focus-board',
+      title: 'Focus Board',
+      generationSelection: {
+        emoji: '🧩',
+        fileName: 'focus-board.app'
+      }
+    });
+
+    expect(getWindow(updated)).toMatchObject({
+      appId: 'app-focus-board',
+      title: 'Focus Board',
+      generationSelection: {
+        emoji: '🧩',
+        fileName: 'focus-board.app'
+      },
+      status: 'loading',
+      x: 18,
+      y: 18,
+      width: 760,
+      height: 520
+    });
+  });
 });
 
 describe('desktop wallpaper state', () => {

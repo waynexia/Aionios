@@ -2,7 +2,7 @@ import { click, getElementCenter, getTaskbarStatus } from '../actions.mjs';
 
 export default {
   id: 'quick-create',
-  title: 'Taskbar quick create creates a desktop file',
+  title: 'Taskbar create-new uses the shared prompt dialog and creates a desktop file',
   dependsOn: ['desktop-shell'],
   async run(ctx) {
     const initialFiles = await ctx.fetchJson(`${ctx.serverUrl}/api/fs/files`);
@@ -26,15 +26,66 @@ export default {
     await ctx.waitFor(
       async () =>
         Boolean(
-          await ctx.evaluate("document.querySelector('[data-quick-create]') instanceof HTMLElement")
+          await ctx.evaluate("document.querySelector('[data-prompt-dialog]') instanceof HTMLElement")
         ),
-      'Quick create popover did not open'
+      'Shared Create New prompt dialog did not open from taskbar'
+    );
+
+    const sharedDialogConfirmed = await ctx.evaluate(
+      `(() => {
+        const dialog = document.querySelector('[data-prompt-dialog]');
+        const title = document.querySelector('[data-prompt-dialog-title]');
+        return (
+          dialog instanceof HTMLElement &&
+          title instanceof HTMLElement &&
+          (title.textContent ?? '').includes('Create New') &&
+          document.querySelector('[data-quick-create]') === null
+        );
+      })()`
+    );
+    if (!sharedDialogConfirmed) {
+      throw new Error('Taskbar create-new did not reuse the shared prompt dialog');
+    }
+
+    const dialogTitle = await ctx.evaluate(
+      `document.querySelector('[data-prompt-dialog-title]')?.textContent?.trim() ?? ''`
+    );
+    if (dialogTitle !== 'Create New (save to /)') {
+      throw new Error(`Unexpected taskbar Create New dialog title: ${JSON.stringify(dialogTitle)}`);
+    }
+
+    const promptDescription = await ctx.evaluate(
+      `document.querySelector('[data-prompt-dialog] .prompt-dialog__description')?.textContent?.trim() ?? ''`
+    );
+    if (!promptDescription.includes('It will be saved in /.')) {
+      throw new Error(`Unexpected taskbar Create New dialog description: ${JSON.stringify(promptDescription)}`);
+    }
+
+    const promptPlaceholder = await ctx.evaluate(
+      `document.querySelector('[data-prompt-dialog-textarea]')?.getAttribute('placeholder') ?? ''`
+    );
+    if (!promptPlaceholder.includes('kanban board app')) {
+      throw new Error(`Unexpected taskbar Create New placeholder: ${JSON.stringify(promptPlaceholder)}`);
+    }
+
+    await ctx.waitFor(
+      async () =>
+        Boolean(
+          await ctx.evaluate(
+            `(() => {
+              const textarea = document.querySelector('[data-prompt-dialog-textarea]');
+              const button = document.querySelector('[data-prompt-dialog-confirm]');
+              return textarea instanceof HTMLTextAreaElement && button instanceof HTMLButtonElement && button.disabled;
+            })()`
+          )
+        ),
+      'Create New prompt dialog did not become interactive'
     );
 
     const instruction = 'Create a plain text file: Quick create CDP check.';
     const filled = await ctx.evaluate(
       `(() => {
-        const textarea = document.querySelector('[data-quick-create-textarea]');
+        const textarea = document.querySelector('[data-prompt-dialog-textarea]');
         if (!(textarea instanceof HTMLTextAreaElement)) return false;
         const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
         if (!setter) return false;
@@ -52,17 +103,17 @@ export default {
         Boolean(
           await ctx.evaluate(
             `(() => {
-              const button = document.querySelector('[data-quick-create-submit]');
+              const button = document.querySelector('[data-prompt-dialog-confirm]');
               return button instanceof HTMLButtonElement && !button.disabled;
             })()`
           )
         ),
-      'Quick create submit button did not become enabled'
+      'Create New prompt submit button did not become enabled'
     );
 
     const submitted = await ctx.evaluate(
       `(() => {
-        const button = document.querySelector('[data-quick-create-submit]');
+        const button = document.querySelector('[data-prompt-dialog-confirm]');
         if (!(button instanceof HTMLButtonElement)) return false;
         if (button.disabled) return false;
         button.click();
@@ -70,12 +121,12 @@ export default {
       })()`
     );
     if (!submitted) {
-      throw new Error('Unable to submit quick create prompt');
+      throw new Error('Unable to submit shared Create New prompt');
     }
 
     await ctx.waitFor(
-      async () => Boolean(await ctx.evaluate("document.querySelector('[data-quick-create]') === null")),
-      'Quick create popover did not close after submit'
+      async () => Boolean(await ctx.evaluate("document.querySelector('[data-prompt-dialog]') === null")),
+      'Create New prompt dialog did not close after submit'
     );
 
     let createdPath = null;

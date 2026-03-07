@@ -93,7 +93,7 @@ export function PromptDialog({
         onPointerDown={(event) => event.stopPropagation()}
       >
         <header className="prompt-dialog__header">
-          <strong>{title}</strong>
+          <strong data-prompt-dialog-title>{title}</strong>
           {description ? (
             <p className="prompt-dialog__description">{description}</p>
           ) : null}
@@ -101,6 +101,7 @@ export function PromptDialog({
         <textarea
           ref={textareaRef}
           className="prompt-dialog__textarea"
+          data-prompt-dialog-textarea
           placeholder={placeholder}
           value={value}
           onChange={(event) => setValue(event.target.value)}
@@ -109,6 +110,7 @@ export function PromptDialog({
           <button
             type="button"
             className="prompt-dialog__button prompt-dialog__button--ghost"
+            data-prompt-dialog-cancel
             onClick={() => onClose()}
           >
             {cancelLabel}
@@ -116,6 +118,7 @@ export function PromptDialog({
           <button
             type="button"
             className="prompt-dialog__button prompt-dialog__button--primary"
+            data-prompt-dialog-confirm
             disabled={!canConfirm}
             onClick={() => {
               const nextValue = value.trim();
@@ -133,4 +136,3 @@ export function PromptDialog({
     </div>
   );
 }
-
