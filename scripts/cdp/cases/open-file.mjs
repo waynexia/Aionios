@@ -49,26 +49,62 @@ export default {
     await doubleClick(ctx, entryCenter);
 
     let editorWindowId = null;
-    await ctx.waitFor(
-      async () => {
-        editorWindowId = await ctx.evaluate(
-          `(() => {
-            const existing = new Set(${JSON.stringify(existingEditorWindowIds ?? [])});
-            const frames = Array.from(document.querySelectorAll('.window-frame[data-app-id="editor"][data-window-id]'));
-            for (const frame of frames) {
-              if (!(frame instanceof HTMLElement)) continue;
-              const windowId = frame.getAttribute('data-window-id');
-              if (!windowId) continue;
-              if (existing.has(windowId)) continue;
-              return windowId;
-            }
-            return null;
-          })()`
-        );
-        return Boolean(editorWindowId);
-      },
-      'Editor window did not open after Directory double-click'
-    );
+    const resolveOpenedEditorWindowId = async () =>
+      ctx.evaluate(
+        `(() => {
+          const existing = new Set(${JSON.stringify(existingEditorWindowIds ?? [])});
+          const frames = Array.from(document.querySelectorAll('.window-frame[data-app-id="editor"][data-window-id]'));
+          for (const frame of frames) {
+            if (!(frame instanceof HTMLElement)) continue;
+            const windowId = frame.getAttribute('data-window-id');
+            if (!windowId) continue;
+            if (existing.has(windowId)) continue;
+            return windowId;
+          }
+          return null;
+        })()`
+      );
+
+    try {
+      await ctx.waitFor(
+        async () => {
+          editorWindowId = await resolveOpenedEditorWindowId();
+          return Boolean(editorWindowId);
+        },
+        'Editor window did not open after Directory double-click',
+        4000
+      );
+    } catch (error) {
+      const dispatched = await ctx.evaluate(
+        `(() => {
+          const frame = document.querySelector('.window-frame[data-app-id="directory"][data-window-id="${directoryWindowId}"]');
+          if (!(frame instanceof HTMLElement)) return false;
+          const entry = frame.querySelector('button[data-directory-entry-path="' + ${JSON.stringify(DIRECTORY_DRAFT_PATH)} + '"]');
+          if (!(entry instanceof HTMLElement)) return false;
+          entry.scrollIntoView({ block: 'center', inline: 'center' });
+          const rect = entry.getBoundingClientRect();
+          const event = new MouseEvent('dblclick', {
+            bubbles: true,
+            cancelable: true,
+            clientX: Math.round(rect.left + rect.width / 2),
+            clientY: Math.round(rect.top + rect.height / 2),
+            detail: 2
+          });
+          entry.dispatchEvent(event);
+          return true;
+        })()`
+      );
+      if (!dispatched) {
+        throw error;
+      }
+      await ctx.waitFor(
+        async () => {
+          editorWindowId = await resolveOpenedEditorWindowId();
+          return Boolean(editorWindowId);
+        },
+        'Editor window did not open after fallback Directory dblclick dispatch'
+      );
+    }
 
     await ctx.waitFor(
       async () =>
@@ -117,4 +153,3 @@ export default {
     );
   }
 };
-

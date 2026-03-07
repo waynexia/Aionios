@@ -212,9 +212,26 @@ export default {
           return false;
         }
         const revision = await ctx.evaluate(getRevisionExpression(windowId));
-        return typeof revision === 'number' && revision > initialRevision;
+        if (typeof revision !== 'number' || revision <= initialRevision) {
+          return false;
+        }
+        const summary = await ctx.evaluate(
+          `(() => {
+            const frame = document.querySelector('.window-frame[data-window-id="${windowId}"]');
+            if (!(frame instanceof HTMLElement)) return '';
+            const paragraphs = Array.from(frame.querySelectorAll('p'));
+            for (const paragraph of paragraphs) {
+              const text = paragraph.textContent?.trim() ?? '';
+              if (text.includes('Last instruction:')) {
+                return text;
+              }
+            }
+            return '';
+          })()`
+        );
+        return summary.includes('Last instruction:');
       },
-      'LLM window did not update to a newer revision'
+      'LLM window did not update to a newer revision with visible content'
     );
 
     const summary = await ctx.evaluate(
