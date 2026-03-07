@@ -154,7 +154,9 @@ export default {
     }
 
     const persistedToml = await fsPromises.readFile(ctx.configPath, 'utf8');
-    const hasTimeout = /codex_timeout_ms\s*=\s*(54_321|54321)/.test(persistedToml);
+    const hasTimeout = new RegExp(
+      String.raw`codex_timeout_ms\s*=\s*${String(PREFERENCE_EXPECTED.codexTimeoutMs).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`
+    ).test(persistedToml);
     if (
       !persistedToml.includes('backend = "codex"') ||
       !hasTimeout ||

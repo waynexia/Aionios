@@ -107,6 +107,13 @@ export function splitCommand(command: string): string[] {
   return args;
 }
 
+export function normalizeCodexTimeoutMs(timeoutMs: number): number | null {
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 0) {
+    throw new Error('Codex timeout must be a non-negative integer.');
+  }
+  return timeoutMs === 0 ? null : timeoutMs;
+}
+
 function stripOutputLastMessageArgs(args: string[]): string[] {
   const next: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
@@ -228,10 +235,20 @@ async function runCodexCommand(
           // ignore consumer errors
         }
       };
-      const timeout = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(new Error(`codex exec timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
+      const effectiveTimeoutMs = normalizeCodexTimeoutMs(timeoutMs);
+      const timeout =
+        effectiveTimeoutMs === null
+          ? null
+          : setTimeout(() => {
+              child.kill('SIGTERM');
+              reject(new Error(`codex exec timed out after ${effectiveTimeoutMs}ms`));
+            }, effectiveTimeoutMs);
+
+      const clearTimeoutIfNeeded = () => {
+        if (timeout !== null) {
+          clearTimeout(timeout);
+        }
+      };
 
       child.stdout.on('data', (chunk) => {
         const text = chunk.toString();
@@ -270,11 +287,11 @@ async function runCodexCommand(
         emitChunk({ stream: 'stderr', chunk: streaming ? redactEmbeddedPreviousSource(text) : text });
       });
       child.on('error', (error) => {
-        clearTimeout(timeout);
+        clearTimeoutIfNeeded();
         reject(error);
       });
       child.on('close', (code) => {
-        clearTimeout(timeout);
+        clearTimeoutIfNeeded();
         if (code !== 0) {
           reject(new Error(`codex exec failed with code ${code}: ${stderr || stdout}`));
           return;

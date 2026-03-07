@@ -42,8 +42,8 @@ function parseTimeoutMs(value: unknown, fieldName: string): number {
       : typeof value === 'string'
         ? Number(value)
         : Number.NaN;
-  if (!Number.isInteger(numericValue) || numericValue <= 0) {
-    throw new Error(`${fieldName} must be a positive integer.`);
+  if (!Number.isInteger(numericValue) || numericValue < 0) {
+    throw new Error(`${fieldName} must be a non-negative integer.`);
   }
   return numericValue;
 }

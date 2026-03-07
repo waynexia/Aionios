@@ -121,6 +121,21 @@ describe('PreferenceConfigStore', () => {
     expect(directoryEntries.filter((entry) => entry.endsWith('.tmp'))).toHaveLength(0);
   });
 
+  it('accepts zero timeout as no-timeout sentinel', async () => {
+    const { configPath } = await rememberTempDir();
+    const store = new PreferenceConfigStore({
+      filePath: configPath,
+      defaults
+    });
+    await store.load();
+
+    const updated = await store.update({ codexTimeoutMs: 0 });
+    const persisted = await fs.readFile(configPath, 'utf8');
+
+    expect(updated.codexTimeoutMs).toBe(0);
+    expect(persisted).toContain('codex_timeout_ms = 0');
+  });
+
   it('rejects invalid updates', async () => {
     const { configPath } = await rememberTempDir();
     const store = new PreferenceConfigStore({
@@ -129,8 +144,8 @@ describe('PreferenceConfigStore', () => {
     });
     await store.load();
 
-    await expect(store.update({ codexTimeoutMs: 0 })).rejects.toThrow(
-      'codexTimeoutMs must be a positive integer.'
+    await expect(store.update({ codexTimeoutMs: -1 })).rejects.toThrow(
+      'codexTimeoutMs must be a non-negative integer.'
     );
     await expect(store.update({ unexpected: true })).rejects.toThrow(
       'Unknown preference field "unexpected".'

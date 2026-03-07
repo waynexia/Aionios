@@ -59,8 +59,8 @@ function toConfig(form: PreferenceFormState): PreferenceConfig {
     throw new Error('Server port must be an integer between 1 and 65535.');
   }
   const timeout = Number.parseInt(form.codexTimeoutMs, 10);
-  if (!Number.isInteger(timeout) || timeout <= 0) {
-    throw new Error('Timeout must be a positive integer in milliseconds.');
+  if (!Number.isInteger(timeout) || timeout < 0) {
+    throw new Error('Timeout must be 0 or a positive integer in milliseconds.');
   }
   return {
     serverPort,
@@ -119,7 +119,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const backendHint = useMemo(
     () =>
       form.llmBackend === 'codex'
-        ? 'Codex backend uses the configured command and timeout.'
+        ? 'Codex backend uses the configured command and timeout. Set timeout to 0 to disable it.'
         : 'Mock backend is deterministic and does not call an external model.',
     [form.llmBackend]
   );
@@ -221,7 +221,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           <input
             data-pref-field="codex-timeout-ms"
             type="number"
-            min={1}
+            min={0}
             step={1}
             value={form.codexTimeoutMs}
             disabled={loading || saving}

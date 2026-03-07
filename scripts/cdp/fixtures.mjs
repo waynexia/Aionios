@@ -1,7 +1,7 @@
 export const PREFERENCE_EXPECTED = {
   llmBackend: 'codex',
   codexCommand: 'codex exec --model gpt-5',
-  codexTimeoutMs: 54_321,
+  codexTimeoutMs: 0,
   terminalShell: '/bin/sh'
 };
 

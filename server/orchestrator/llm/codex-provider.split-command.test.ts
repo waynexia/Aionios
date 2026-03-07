@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { splitCommand } from './codex-provider';
+import { normalizeCodexTimeoutMs, splitCommand } from './codex-provider';
 
 describe('splitCommand', () => {
   it('splits basic commands on whitespace', () => {
@@ -45,3 +45,18 @@ describe('splitCommand', () => {
   });
 });
 
+describe('normalizeCodexTimeoutMs', () => {
+  it('keeps positive timeout values', () => {
+    expect(normalizeCodexTimeoutMs(120_000)).toBe(120_000);
+  });
+
+  it('treats zero as no timeout', () => {
+    expect(normalizeCodexTimeoutMs(0)).toBeNull();
+  });
+
+  it('rejects negative timeout values', () => {
+    expect(() => normalizeCodexTimeoutMs(-1)).toThrow(
+      'Codex timeout must be a non-negative integer.'
+    );
+  });
+});
