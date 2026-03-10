@@ -10,6 +10,7 @@ import editor from './editor.mjs';
 import finalState from './final-state.mjs';
 import llmUpdate from './llm-update.mjs';
 import media from './media.mjs';
+import mobileShell from './mobile-shell.mjs';
 import persistedApp from './persisted-app.mjs';
 import preference from './preference.mjs';
 import recycleBin from './recycle-bin.mjs';
@@ -32,6 +33,7 @@ export const cases = [
   openFile,
   recycleBin,
   media,
+  mobileShell,
   editor,
   finalState
 ];

@@ -74,9 +74,14 @@ function createDefaultPositions(apps: AppDefinition[]) {
 interface DesktopIconsProps {
   apps: AppDefinition[];
   onOpenApp: (appId: string) => void;
+  interactionMode?: 'desktop' | 'mobile';
 }
 
-export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
+export function DesktopIcons({
+  apps,
+  onOpenApp,
+  interactionMode = 'desktop'
+}: DesktopIconsProps) {
   const containerRef = useRef<HTMLElement | null>(null);
   const dragSessionRef = useRef<IconDragSession | null>(null);
   const suppressedOpenUntilRef = useRef<Record<string, number>>({});
@@ -84,6 +89,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     createDefaultPositions(apps)
   );
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
+  const isMobile = interactionMode === 'mobile';
 
   useEffect(() => {
     setPositions((current) => {
@@ -136,7 +142,7 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
     appId: string
   ) => {
     setSelectedAppId(appId);
-    if (event.button !== 0) {
+    if ((event.pointerType === 'mouse' && event.button !== 0) || isMobile) {
       return;
     }
     const container = containerRef.current;
@@ -233,12 +239,18 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
       return;
     }
     setSelectedAppId(appId);
+    if (isMobile) {
+      onOpenApp(appId);
+    }
   };
 
   const onIconDoubleClick = (
     event: ReactMouseEvent<HTMLButtonElement>,
     appId: string
   ) => {
+    if (isMobile) {
+      return;
+    }
     const suppressUntil = suppressedOpenUntilRef.current[appId] ?? 0;
     if (suppressUntil > Date.now()) {
       event.preventDefault();
@@ -251,6 +263,37 @@ export function DesktopIcons({ apps, onOpenApp }: DesktopIconsProps) {
   const onIconContextMenu = (appId: string) => {
     setSelectedAppId(appId);
   };
+
+  if (isMobile) {
+    return (
+      <section
+        ref={containerRef}
+        className="desktop-icons desktop-icons--mobile"
+        aria-label="Desktop apps"
+        onPointerDown={onDesktopPointerDown}
+        onMouseDown={onDesktopMouseDown}
+      >
+        {apps.map((app) => {
+          const isSelected = selectedAppId === app.appId;
+          return (
+            <button
+              key={app.appId}
+              className={`desktop-icon desktop-icon--mobile${isSelected ? ' desktop-icon--selected' : ''}`}
+              data-app-id={app.appId}
+              onPointerDown={(event) => onIconPointerDown(event, app.appId)}
+              onMouseDown={() => onIconMouseDown(app.appId)}
+              onClick={(event) => onIconClick(event, app.appId)}
+              onContextMenu={() => onIconContextMenu(app.appId)}
+              title={`${app.title} — ${app.hint}`}
+            >
+              <span className="desktop-icon__emoji">{app.icon}</span>
+              <span className="desktop-icon__label">{app.title}</span>
+            </button>
+          );
+        })}
+      </section>
+    );
+  }
 
   return (
     <section

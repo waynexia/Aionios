@@ -37,21 +37,28 @@ export function useDesktopContextMenu(options: {
     setContextMenu(null);
   }, []);
 
+  const openContextMenuAt = useCallback((input: { target: Element | null; x: number; y: number }) => {
+    setContextMenu(
+      resolveDesktopContextMenuState({
+        target: input.target,
+        x: input.x,
+        y: input.y
+      })
+    );
+  }, []);
+
   const onContextMenu = useCallback((event: ReactMouseEvent<HTMLElement>) => {
     if (event.shiftKey || shouldKeepNativeContextMenu(event.target)) {
       return;
     }
     event.preventDefault();
     event.stopPropagation();
-    const target = event.target instanceof Element ? event.target : null;
-    setContextMenu(
-      resolveDesktopContextMenuState({
-        target,
-        x: event.clientX,
-        y: event.clientY
-      })
-    );
-  }, []);
+    openContextMenuAt({
+      target: event.target instanceof Element ? event.target : null,
+      x: event.clientX,
+      y: event.clientY
+    });
+  }, [openContextMenuAt]);
 
   const contextMenuItems = useMemo(
     () =>
@@ -83,6 +90,7 @@ export function useDesktopContextMenu(options: {
     contextMenu,
     contextMenuItems,
     closeContextMenu,
+    openContextMenuAt,
     onContextMenu
   };
 }

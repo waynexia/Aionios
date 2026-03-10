@@ -23,6 +23,7 @@ interface WindowFrameProps {
   windowItem: DesktopWindow;
   showRevision?: boolean;
   focused: boolean;
+  mobileMode?: boolean;
   onFocus: () => void;
   onBoundsChange: (bounds: WindowBounds) => void;
   onToggleMaximize: () => void;
@@ -38,6 +39,7 @@ export function WindowFrame({
   windowItem,
   showRevision = true,
   focused,
+  mobileMode = false,
   onFocus,
   onBoundsChange,
   onToggleMaximize,
@@ -55,11 +57,11 @@ export function WindowFrame({
     mode: 'move' | 'resize',
     direction?: ResizeDirection
   ) => {
-    if (event.button !== 0) {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
       return;
     }
     onFocus();
-    if (windowItem.maximized) {
+    if (windowItem.maximized || mobileMode) {
       return;
     }
 
@@ -158,7 +160,9 @@ export function WindowFrame({
     window.addEventListener('pointercancel', stopInteraction);
   };
 
-  const frameStyle = windowItem.maximized
+  const frameStyle = mobileMode
+    ? { zIndex: windowItem.zIndex }
+    : windowItem.maximized
     ? { zIndex: windowItem.zIndex }
     : {
         zIndex: windowItem.zIndex,
@@ -173,6 +177,8 @@ export function WindowFrame({
       ref={frameRef}
       className={`window-frame ${focused ? 'window-frame--focused' : ''} ${
         windowItem.maximized ? 'window-frame--maximized' : ''
+      } ${mobileMode ? 'window-frame--mobile' : ''}${
+        mobileMode && focused ? ' window-frame--mobile-focused' : ''
       }`}
       style={frameStyle}
       data-session-id={windowItem.sessionId}
@@ -182,8 +188,8 @@ export function WindowFrame({
     >
       <header
         className="window-frame__header"
-        onDoubleClick={() => onToggleMaximize()}
-        onPointerDown={(event) => startInteraction(event, 'move')}
+        onDoubleClick={mobileMode ? undefined : () => onToggleMaximize()}
+        onPointerDown={mobileMode ? undefined : (event) => startInteraction(event, 'move')}
       >
         <div className="window-frame__title">
           <span>{windowItem.title}</span>
@@ -231,34 +237,38 @@ export function WindowFrame({
               ✨
             </button>
           ) : null}
-          <button
-            type="button"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onMinimize}
-            aria-label="Minimize window"
-          >
-            _
-          </button>
-          <button
-            type="button"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onToggleMaximize}
-            aria-label={windowItem.maximized ? 'Restore window' : 'Maximize window'}
-          >
-            {windowItem.maximized ? '❐' : '□'}
-          </button>
-          <button
-            type="button"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={onClose}
-            aria-label="Close window"
-          >
-            ×
-          </button>
+          {mobileMode ? null : (
+            <>
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={onMinimize}
+                aria-label="Minimize window"
+              >
+                _
+              </button>
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={onToggleMaximize}
+                aria-label={windowItem.maximized ? 'Restore window' : 'Maximize window'}
+              >
+                {windowItem.maximized ? '❐' : '□'}
+              </button>
+              <button
+                type="button"
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={onClose}
+                aria-label="Close window"
+              >
+                ×
+              </button>
+            </>
+          )}
         </div>
       </header>
       <section className="window-frame__content">{children}</section>
-      {windowItem.maximized
+      {windowItem.maximized || mobileMode
         ? null
         : RESIZE_DIRECTIONS.map((direction) => (
             <div

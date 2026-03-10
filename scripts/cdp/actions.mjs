@@ -41,6 +41,50 @@ export async function click(ctx, anchor, button = 'left') {
   });
 }
 
+async function dispatchTouch(ctx, type, x, y) {
+  await ctx.Input.dispatchTouchEvent({
+    type,
+    touchPoints:
+      x === null || y === null
+        ? []
+        : [
+            {
+              x: Math.round(x),
+              y: Math.round(y),
+              radiusX: 6,
+              radiusY: 6,
+              id: 1
+            }
+          ]
+  });
+}
+
+export async function touchTap(ctx, anchor) {
+  await dispatchTouch(ctx, 'touchStart', anchor.x, anchor.y);
+  await ctx.delay(40);
+  await dispatchTouch(ctx, 'touchEnd', null, null);
+}
+
+export async function touchLongPress(ctx, anchor, holdMs = 560) {
+  await dispatchTouch(ctx, 'touchStart', anchor.x, anchor.y);
+  await ctx.delay(holdMs);
+  await dispatchTouch(ctx, 'touchEnd', null, null);
+}
+
+export async function touchSwipe(ctx, points, stepDelayMs = 18) {
+  if (!Array.isArray(points) || points.length < 2) {
+    throw new Error('touchSwipe requires at least two points');
+  }
+  const [start, ...rest] = points;
+  await dispatchTouch(ctx, 'touchStart', start.x, start.y);
+  for (const point of rest) {
+    await ctx.delay(stepDelayMs);
+    await dispatchTouch(ctx, 'touchMove', point.x, point.y);
+  }
+  await ctx.delay(stepDelayMs);
+  await dispatchTouch(ctx, 'touchEnd', null, null);
+}
+
 export async function doubleClick(ctx, anchor, button = 'left') {
   await ctx.Input.dispatchMouseEvent({
     type: 'mouseMoved',

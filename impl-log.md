@@ -259,6 +259,39 @@
 - [x] Step 5 complete — added reducer/config/provider unit coverage and strengthened CDP coverage for shared dialog usage, immediate placeholder opening under delayed requests, and timeout `0` persistence.
 - [x] Step 6 complete — lint, tests, typecheck, and full Chrome CDP verification pass.
 
+## 2026-03-10 — Mobile adaptive shell + phone interaction model
+
+### Task Breakdown
+
+1. Inspect the desktop shell, window lifecycle, context menu, and CDP harness to define a host-level mobile mode contract.
+2. Add mobile shell state and viewport detection so small screens switch from freeform desktop windows to phone-style home/app/recents modes.
+3. Implement mobile navigation behaviors: Back/Home/Recents buttons, active-app recovery, and recent-task management.
+4. Adapt touch interactions for mobile: tap-to-open icons, long-press context menus, edge/home gestures, and recent-card dismiss gestures.
+5. Add responsive shell styling for mobile windows, dialogs, task manager, and system chrome while preserving the desktop path.
+6. Add unit coverage and Chrome CDP mobile verification for the phone flow, then iterate on any UX gaps discovered in the real run.
+
+### Progress
+
+- [x] Step 1 complete — reviewed `App`, `WindowFrame`, `Taskbar`, reducer state, context-menu plumbing, and CDP harness/current cases to identify the desktop assumptions that must split for mobile.
+- [x] Step 2 complete — added compact-viewport detection and a host-level mobile shell state that switches between home, app, and recent-task surfaces.
+- [x] Step 3 complete — implemented mobile Back/Home/Recents navigation, app restore logic, and foreground task transitions without disturbing the desktop path.
+- [x] Step 4 complete — added tap, long-press, touch, and gesture handling for the mobile shell, including context-menu press/hold, home swipe, edge-swipe back, and task-card dismiss/restore.
+- [x] Step 5 complete — shipped responsive mobile shell chrome (status bar, system nav, floating create action, full-screen windows, recent-task cards, and mobile-friendly sheets/dialogs).
+- [x] Step 6 complete — lint/tests/typecheck pass locally, isolated `mobile-shell` CDP verification passes, and the full Chrome CDP suite passes with the mobile case included.
+
+### Validation
+
+- `npm run lint`: PASS
+- `npm run test`: PASS (23 files, 109 tests)
+- `npm run typecheck`: PASS
+- `npm run verify:cdp -- --case mobile-shell`: PASS
+  - Temp dir: `/tmp/aionios-cdp-cMMw3B`
+  - Logs: `/tmp/aionios-cdp-cMMw3B/logs`
+- `npm run verify:cdp`: PASS
+  - Temp dir: `/tmp/aionios-cdp-MRGWj9`
+  - Logs: `/tmp/aionios-cdp-MRGWj9/logs`
+  - Final-state payload: `{ windows: 11, icons: 10, preferenceStatus: 'Preferences loaded.' }`
+
 ### Validation
 
 - `npm run lint`: PASS (exit 0)

@@ -200,10 +200,11 @@ export async function createCdpHarness(options = {}) {
     }
 
     cdpClient = await CDP({ target, port: cdpPort });
-    const { Page, Runtime, Input } = cdpClient;
+    const { Emulation, Page, Runtime, Input } = cdpClient;
 
     await Page.enable();
     await Runtime.enable();
+    await Emulation.enable?.();
 
     await Page.navigate({ url: serverUrl });
     await Page.loadEventFired();
@@ -216,6 +217,7 @@ export async function createCdpHarness(options = {}) {
       chromeProfileDir,
       configPath,
       cdpPort,
+      Emulation,
       Page,
       Runtime,
       Input,
