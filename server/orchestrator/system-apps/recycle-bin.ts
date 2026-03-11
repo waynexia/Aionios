@@ -265,7 +265,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           minHeight: 0,
           padding: 14,
           borderRadius: 28,
-          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
             'linear-gradient(180deg, rgba(18,16,15,0.9), rgba(9,12,20,0.92))',
           boxShadow: '0 24px 50px rgba(3,5,10,0.28)'
@@ -279,7 +279,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         }}
       >
         {loading ? (
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-accent, #e0b45d)' }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-accent, #a8c0ac)' }}>
             Loading...
           </p>
         ) : items.length === 0 ? (
@@ -323,7 +323,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           gap: 8,
           padding: '12px 14px',
           borderRadius: 24,
-          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background: 'rgba(10,13,22,0.82)'
         }}
       >

@@ -1,5 +1,45 @@
 # Aionios Implementation Log
 
+## 2026-03-12 — Frontend redesign refinement from usability feedback
+
+### Feedback Applied
+
+- Shift the accent system from brass/gold to low-saturation light green.
+- Replace decorative title typography with more readable sans-serif titles.
+- Remove the always-rendered desktop icon hint line; keep hover affordance usable without hidden text being obscured by neighboring icons.
+- Use the feedback as a broader usability heuristic and check nearby surfaces for similar issues.
+
+### Task Breakdown
+
+1. Audit the redesigned shell for palette, typography, and hover behaviors matching the user feedback.
+2. Update shell tokens, title typography, icon-label behavior, and PWA theme metadata to the refined direction.
+3. Sweep built-in app fallback styles for leftover brass accents so the shell and system apps remain consistent.
+4. Run static validation again.
+5. Verify the fixes in real Chrome via CDP with focused checks and a nearby-surface sweep.
+6. Commit the refinement cleanly without touching unrelated dirty files.
+
+### Progress
+
+- [x] Step 1 complete — traced remaining brass accents, uppercase app-label styling, decorative title fonts, and icon hint behavior across shell and system-app surfaces.
+- [x] Step 2 complete — moved the shell to a muted green palette, normalized desktop/window title typography to `Instrument Sans`, hid the inline icon hint line, and updated theme-color metadata.
+- [x] Step 3 complete — aligned directory/editor/media/recycle-bin fallback accent values with the refined shell palette.
+- [x] Step 4 complete — `npm run check` passed after the refinement.
+- [x] Step 5 complete — Chrome/CDP verification confirmed muted green accents, non-uppercase desktop icon labels, hidden icon hint lines, readable window title fonts, and a usable opened `Directory` window.
+- [ ] Step 6 in progress — committing the refinement pass.
+
+### Validation
+
+- `npm run check`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS (24 files, 110 tests)
+  - `npm run typecheck`: PASS
+- Chrome CDP runtime verification: PASS
+  - Accent border sample: `rgba(198, 220, 203, 0.4)`
+  - Desktop icon label `textTransform`: `none`
+  - Desktop icon hint computed `display`: `none`
+  - Opened `Directory` window title `fontFamily`: `"Instrument Sans", "Segoe UI", sans-serif`
+  - Spot-check inside `Directory`: green accents remained consistent; no obvious leftover brass regression found
+
 ## 2026-03-12 — Full frontend redesign, multi-pass
 
 ### Design Direction
@@ -26,7 +66,7 @@
 - [x] Step 4 complete — redesigned context menu, prompt/revision/output dialogs, and shared shell controls.
 - [x] Step 5 complete — redesigned compact/mobile status, navigation, task switcher, and home action; aligned built-in system app surfaces with shared shell tokens.
 - [x] Step 6 complete — `npm run check` passed and Chrome/CDP verification confirmed the redesigned shell and window chrome render in a real browser.
-- [ ] Step 7 in progress — organizing the redesign into conventional commits.
+- [x] Step 7 complete — organized the redesign into conventional commits.
 
 ### Pass Notes
 

@@ -253,7 +253,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           gap: 6,
           padding: '16px 18px',
           borderRadius: 24,
-          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
             'linear-gradient(145deg, rgba(26,22,18,0.92), rgba(15,18,29,0.94))',
           boxShadow: '0 24px 50px rgba(3,5,10,0.3)'
@@ -296,16 +296,16 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                 borderRadius: 999,
                 border:
                   selectedPath === entry.path
-                    ? '1px solid rgba(226,192,116,0.74)'
-                    : '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+                    ? '1px solid rgba(168,192,172,0.7)'
+                    : '1px solid var(--shell-border, rgba(168,192,172,0.24))',
                 background:
                   selectedPath === entry.path
-                    ? 'linear-gradient(135deg, rgba(95,57,20,0.94), rgba(37,41,68,0.94))'
-                    : 'rgba(15,19,30,0.72)',
+                    ? 'linear-gradient(135deg, rgba(72,102,83,0.94), rgba(31,45,38,0.94))'
+                    : 'rgba(14,21,18,0.72)',
                 color:
                   selectedPath === entry.path
-                    ? 'var(--shell-text-strong, #fff7e5)'
-                    : 'var(--shell-text, #f4e7c8)',
+                    ? 'var(--shell-text-strong, #f1f7f2)'
+                    : 'var(--shell-text, #d9e6dd)',
                 cursor: loadingFiles || loadingFile || saving ? 'default' : 'pointer',
                 padding: '8px 14px',
                 whiteSpace: 'nowrap',
@@ -341,9 +341,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             minHeight: 0,
             resize: 'none',
             borderRadius: 24,
-            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background: 'linear-gradient(180deg, rgba(14,16,25,0.96), rgba(9,12,20,0.92))',
-            color: 'var(--shell-text-strong, #fff7e5)',
+            color: 'var(--shell-text-strong, #f1f7f2)',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
             fontSize: 12,
             lineHeight: 1.6,
@@ -361,13 +361,13 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             disabled={!selectedPath || loadingFiles || loadingFile || saving || !hasUnsavedChanges}
             style={{
               borderRadius: 999,
-              border: '1px solid rgba(226,192,116,0.34)',
+              border: '1px solid rgba(168,192,172,0.32)',
               padding: '10px 16px',
               background:
                 !selectedPath || loadingFiles || loadingFile || saving || !hasUnsavedChanges
-                  ? 'rgba(62,50,32,0.38)'
-                  : 'linear-gradient(135deg, rgba(171,118,47,0.98), rgba(110,55,21,0.98))',
-              color: '#fff7e5',
+                  ? 'rgba(36,52,44,0.38)'
+                  : 'linear-gradient(135deg, rgba(125,156,133,0.98), rgba(78,105,88,0.98))',
+              color: '#f1f7f2',
               cursor:
                 !selectedPath || loadingFiles || loadingFile || saving || !hasUnsavedChanges
                   ? 'default'
@@ -391,7 +391,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             {status}
           </span>
           {highlighting ? (
-            <span style={{ fontSize: 12, color: 'var(--shell-accent, #e0b45d)' }}>
+            <span style={{ fontSize: 12, color: 'var(--shell-accent, #a8c0ac)' }}>
               Updating preview…
             </span>
           ) : null}
@@ -407,7 +407,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             minHeight: 0,
             overflow: 'auto',
             borderRadius: 24,
-            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background: 'linear-gradient(180deg, rgba(10,12,20,0.98), rgba(18,16,20,0.94))',
             padding: 14,
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'

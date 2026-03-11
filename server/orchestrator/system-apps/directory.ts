@@ -400,7 +400,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             overflow: 'auto',
             padding: 14,
             borderRadius: 28,
-            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background:
               'linear-gradient(180deg, rgba(18,16,15,0.9), rgba(9,12,20,0.92))',
             boxShadow: '0 24px 50px rgba(3,5,10,0.28)'
@@ -414,7 +414,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           }}
         >
           {loadingList ? (
-            <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-accent, #e0b45d)' }}>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-accent, #a8c0ac)' }}>
               Loading files...
             </p>
           ) : files.length === 0 ? (
@@ -439,7 +439,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                     fontSize: 11,
                     letterSpacing: '0.18em',
                     textTransform: 'uppercase',
-                    color: 'var(--shell-accent, #e0b45d)'
+                    color: 'var(--shell-accent, #a8c0ac)'
                   }}
                 >
                   {group.directory}
@@ -490,7 +490,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             minHeight: 0,
             padding: 16,
             borderRadius: 28,
-            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background:
               'linear-gradient(180deg, rgba(10,12,20,0.96), rgba(18,16,20,0.94))',
             boxShadow: '0 24px 50px rgba(3,5,10,0.28)'
@@ -511,7 +511,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           </div>
 
           <label style={{ display: 'grid', gap: 6, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-            <span style={{ color: 'var(--shell-accent, #e0b45d)' }}>Path</span>
+            <span style={{ color: 'var(--shell-accent, #a8c0ac)' }}>Path</span>
             <input
               data-directory-path
               value={draftPath}
@@ -519,9 +519,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               onChange={(event) => setDraftPath(event.target.value)}
               style={{
                 borderRadius: 18,
-                border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+                border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
                 background: 'rgba(17,20,31,0.86)',
-                color: 'var(--shell-text-strong, #fff7e5)',
+                color: 'var(--shell-text-strong, #f1f7f2)',
                 padding: '12px 14px',
                 boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
               }}
@@ -538,7 +538,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               minHeight: 0
             }}
           >
-            <span style={{ color: 'var(--shell-accent, #e0b45d)' }}>Preview / Editor</span>
+            <span style={{ color: 'var(--shell-accent, #a8c0ac)' }}>Preview / Editor</span>
             <textarea
               data-directory-content
               value={draftContent}
@@ -549,9 +549,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                 flex: 1,
                 minHeight: 180,
                 borderRadius: 24,
-                border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+                border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
                 background: 'rgba(11,14,24,0.92)',
-                color: 'var(--shell-text-strong, #fff7e5)',
+                color: 'var(--shell-text-strong, #f1f7f2)',
                 padding: '16px 18px',
                 resize: 'vertical',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -570,7 +570,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           gap: 8,
           padding: '12px 14px',
           borderRadius: 24,
-          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background: 'rgba(10,13,22,0.82)'
         }}
       >
@@ -584,12 +584,12 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           style={{
             justifySelf: 'start',
             borderRadius: 999,
-            border: '1px solid rgba(226,192,116,0.34)',
+            border: '1px solid rgba(168,192,172,0.32)',
             padding: '10px 16px',
             background: canSave
-              ? 'linear-gradient(135deg, rgba(171,118,47,0.98), rgba(110,55,21,0.98))'
-              : 'rgba(62,50,32,0.38)',
-            color: '#fff7e5',
+              ? 'linear-gradient(135deg, rgba(125,156,133,0.98), rgba(78,105,88,0.98))'
+              : 'rgba(36,52,44,0.38)',
+            color: '#f1f7f2',
             cursor: canSave ? 'pointer' : 'default'
           }}
         >

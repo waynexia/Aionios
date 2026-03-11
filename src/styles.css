@@ -1,31 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  color: #ebdfc8;
+  color: #d9e6dd;
   font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
   background:
-    radial-gradient(circle at top, rgba(205, 152, 71, 0.12), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(66, 99, 121, 0.24), transparent 30%),
-    linear-gradient(180deg, #07080c 0%, #0b0c12 42%, #090b11 100%);
+    radial-gradient(circle at top, rgba(127, 166, 141, 0.14), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(97, 122, 114, 0.22), transparent 30%),
+    linear-gradient(180deg, #070b0a 0%, #0a100f 42%, #09100e 100%);
   color-scheme: dark;
   --mobile-status-bar-height: 34px;
   --mobile-nav-height: 82px;
   --mobile-safe-top: env(safe-area-inset-top, 0px);
   --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
-  --shell-bg: #090b11;
-  --shell-bg-elevated: rgba(14, 16, 24, 0.92);
-  --shell-panel: rgba(20, 17, 19, 0.82);
-  --shell-panel-strong: rgba(18, 16, 20, 0.94);
-  --shell-panel-soft: rgba(34, 27, 24, 0.54);
-  --shell-text: #ebdfc8;
-  --shell-text-strong: #fff7e6;
-  --shell-muted: rgba(235, 223, 200, 0.68);
-  --shell-accent: #d6a15c;
-  --shell-accent-soft: rgba(214, 161, 92, 0.16);
-  --shell-accent-glow: rgba(214, 161, 92, 0.34);
-  --shell-cool: #8eb6ba;
-  --shell-border: rgba(214, 161, 92, 0.22);
-  --shell-border-strong: rgba(235, 194, 125, 0.42);
+  --shell-bg: #09100e;
+  --shell-bg-elevated: rgba(13, 19, 17, 0.92);
+  --shell-panel: rgba(17, 23, 20, 0.82);
+  --shell-panel-strong: rgba(13, 19, 17, 0.94);
+  --shell-panel-soft: rgba(23, 33, 28, 0.56);
+  --shell-text: #d9e6dd;
+  --shell-text-strong: #f1f7f2;
+  --shell-muted: rgba(217, 230, 221, 0.68);
+  --shell-accent: #a8c0ac;
+  --shell-accent-soft: rgba(168, 192, 172, 0.16);
+  --shell-accent-glow: rgba(168, 192, 172, 0.3);
+  --shell-cool: #96b3a5;
+  --shell-border: rgba(168, 192, 172, 0.22);
+  --shell-border-strong: rgba(198, 220, 203, 0.4);
   --shell-shadow:
     0 24px 80px rgba(0, 0, 0, 0.42),
     0 6px 18px rgba(0, 0, 0, 0.22);
@@ -35,9 +35,9 @@
   --shell-radius-xl: 30px;
   --shell-radius-lg: 22px;
   --shell-radius-md: 16px;
-  --terminal-background: #0b0f15;
-  --terminal-foreground: #f7ecd2;
-  --terminal-selection: rgba(214, 161, 92, 0.26);
+  --terminal-background: #0b1210;
+  --terminal-foreground: #e7f1e8;
+  --terminal-selection: rgba(168, 192, 172, 0.22);
 }
 
 * {
@@ -45,7 +45,7 @@
 }
 
 *::selection {
-  background: rgba(214, 161, 92, 0.26);
+  background: rgba(168, 192, 172, 0.24);
   color: var(--shell-text-strong);
 }
 
@@ -93,7 +93,7 @@ select {
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
   border: 2px solid transparent;
-  background: linear-gradient(180deg, rgba(214, 161, 92, 0.72), rgba(111, 80, 46, 0.72));
+  background: linear-gradient(180deg, rgba(168, 192, 172, 0.76), rgba(92, 118, 101, 0.76));
   background-clip: padding-box;
 }
 
@@ -108,16 +108,16 @@ select {
   text-align: center;
   color: var(--shell-text-strong);
   background:
-    radial-gradient(circle at 50% 18%, rgba(214, 161, 92, 0.32), transparent 18%),
-    radial-gradient(circle at 24% 28%, rgba(88, 119, 135, 0.32), transparent 26%),
-    linear-gradient(180deg, #07080c 0%, #0d1018 100%);
+    radial-gradient(circle at 50% 18%, rgba(168, 192, 172, 0.28), transparent 18%),
+    radial-gradient(circle at 24% 28%, rgba(115, 151, 137, 0.24), transparent 26%),
+    linear-gradient(180deg, #070b0a 0%, #0e1513 100%);
 }
 
 .booting-shell::before {
   content: '';
   position: absolute;
   inset: 8%;
-  border: 1px solid rgba(235, 194, 125, 0.18);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   border-radius: 32px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
 }
@@ -130,9 +130,9 @@ select {
   height: 100%;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(214, 161, 92, 0.08), transparent 26%),
-    radial-gradient(circle at bottom right, rgba(98, 126, 145, 0.18), transparent 22%),
-    linear-gradient(180deg, #08090d 0%, #0d1018 38%, #0a0c13 100%);
+    radial-gradient(circle at top left, rgba(168, 192, 172, 0.08), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(109, 139, 129, 0.16), transparent 22%),
+    linear-gradient(180deg, #08100d 0%, #0d1513 38%, #0a100e 100%);
 }
 
 .desktop-shell::before,
@@ -155,7 +155,7 @@ select {
 
 .desktop-shell::after {
   background:
-    radial-gradient(circle at 50% -10%, rgba(214, 161, 92, 0.18), transparent 26%),
+    radial-gradient(circle at 50% -10%, rgba(168, 192, 172, 0.16), transparent 26%),
     linear-gradient(180deg, transparent, rgba(5, 6, 10, 0.2));
 }
 
@@ -191,7 +191,7 @@ select {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(circle at 50% 0%, rgba(214, 161, 92, 0.16), transparent 28%),
+    radial-gradient(circle at 50% 0%, rgba(168, 192, 172, 0.14), transparent 28%),
     linear-gradient(180deg, rgba(7, 8, 12, 0.32), rgba(8, 10, 16, 0.7));
   backdrop-filter: blur(24px) saturate(120%);
 }
@@ -223,9 +223,9 @@ select {
 .desktop-wallpaper__atmosphere {
   inset: -12%;
   background:
-    radial-gradient(circle at 50% 12%, rgba(214, 161, 92, 0.24), transparent 18%),
-    radial-gradient(circle at 18% 38%, rgba(110, 148, 166, 0.2), transparent 22%),
-    radial-gradient(circle at 86% 26%, rgba(168, 97, 74, 0.18), transparent 20%);
+    radial-gradient(circle at 50% 12%, rgba(168, 192, 172, 0.22), transparent 18%),
+    radial-gradient(circle at 18% 38%, rgba(118, 154, 140, 0.18), transparent 22%),
+    radial-gradient(circle at 86% 26%, rgba(94, 122, 112, 0.16), transparent 20%);
   filter: blur(18px);
   opacity: 0.96;
 }
@@ -247,11 +247,11 @@ select {
   width: 72vw;
   height: 72vw;
   border-radius: 50%;
-  border: 1px solid rgba(235, 194, 125, 0.18);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   transform: translateX(-50%);
   box-shadow:
-    0 0 0 18px rgba(235, 194, 125, 0.04),
-    0 0 0 56px rgba(235, 194, 125, 0.025);
+    0 0 0 18px rgba(198, 220, 203, 0.04),
+    0 0 0 56px rgba(198, 220, 203, 0.025);
 }
 
 .desktop-wallpaper__overlay {
@@ -273,15 +273,16 @@ select {
 }
 
 .desktop-wallpaper__brandmark span {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
   font-size: clamp(22px, 3vw, 34px);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .desktop-wallpaper__brandmark small {
   font-size: 11px;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: rgba(235, 223, 200, 0.48);
 }
@@ -327,8 +328,8 @@ select {
 .desktop-icon--selected {
   border-color: var(--shell-border-strong);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.16), transparent 40%),
-    linear-gradient(180deg, rgba(28, 22, 18, 0.9), rgba(14, 16, 24, 0.7));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.16), transparent 40%),
+    linear-gradient(180deg, rgba(18, 26, 22, 0.9), rgba(10, 16, 14, 0.72));
   box-shadow: var(--shell-shadow-soft);
   transform: translateY(-2px);
 }
@@ -350,7 +351,7 @@ select {
   inset: 12px 14px auto;
   height: 54px;
   border-radius: 18px;
-  background: radial-gradient(circle at center, rgba(214, 161, 92, 0.4), transparent 70%);
+  background: radial-gradient(circle at center, rgba(168, 192, 172, 0.36), transparent 70%);
   filter: blur(14px);
   opacity: 0;
   transition: opacity 180ms ease;
@@ -372,8 +373,8 @@ select {
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.3), transparent 55%),
-    linear-gradient(180deg, rgba(42, 31, 22, 0.96), rgba(14, 16, 23, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.22), transparent 55%),
+    linear-gradient(180deg, rgba(25, 38, 31, 0.96), rgba(12, 18, 16, 0.96));
   font-size: 1.65rem;
   line-height: 1;
   box-shadow:
@@ -387,34 +388,13 @@ select {
   display: block;
   max-width: 100%;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   text-align: center;
-  text-transform: uppercase;
 }
 
 .desktop-icon__hint {
-  position: relative;
-  z-index: 1;
-  display: block;
-  max-width: 100%;
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--shell-muted);
-  text-align: center;
-  text-wrap: balance;
-}
-
-.desktop-icon:not(.desktop-icon--mobile) .desktop-icon__hint {
-  opacity: 0;
-  transform: translateY(-4px);
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.desktop-icon:hover .desktop-icon__hint,
-.desktop-icon--selected .desktop-icon__hint {
-  opacity: 1;
-  transform: translateY(0);
+  display: none;
 }
 
 .desktop-icon--mobile .desktop-icon__emoji {
@@ -461,8 +441,8 @@ select {
   transform: translateY(-2px);
   border-color: var(--shell-border-strong);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.14), transparent 42%),
-    linear-gradient(180deg, rgba(35, 27, 20, 0.92), rgba(14, 16, 23, 0.86));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(18, 28, 23, 0.92), rgba(12, 18, 16, 0.88));
   box-shadow: var(--shell-shadow-soft);
 }
 
@@ -473,16 +453,16 @@ select {
   height: 54px;
   border-radius: 18px;
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.24), transparent 56%),
-    linear-gradient(180deg, rgba(42, 31, 22, 0.96), rgba(14, 16, 23, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.2), transparent 56%),
+    linear-gradient(180deg, rgba(24, 36, 30, 0.96), rgba(12, 18, 16, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 1.45rem;
 }
 
 .icon-tile__label {
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   text-align: center;
   text-wrap: balance;
 }
@@ -512,9 +492,9 @@ select {
   flex-direction: column;
   border-radius: 30px;
   overflow: hidden;
-  border: 1px solid rgba(235, 194, 125, 0.2);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   background:
-    linear-gradient(180deg, rgba(22, 18, 18, 0.98), rgba(11, 13, 20, 0.96));
+    linear-gradient(180deg, rgba(17, 23, 20, 0.98), rgba(10, 15, 13, 0.96));
   box-shadow: var(--shell-shadow);
   pointer-events: auto;
   backdrop-filter: blur(26px) saturate(124%);
@@ -534,16 +514,16 @@ select {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.12), transparent 34%),
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.12), transparent 34%),
     linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.01));
   pointer-events: none;
 }
 
 .window-frame--focused {
-  border-color: rgba(235, 194, 125, 0.4);
+  border-color: rgba(198, 220, 203, 0.34);
   box-shadow:
     0 34px 100px rgba(0, 0, 0, 0.46),
-    0 0 0 1px rgba(235, 194, 125, 0.08);
+    0 0 0 1px rgba(198, 220, 203, 0.08);
 }
 
 .window-frame--mobile {
@@ -562,7 +542,7 @@ select {
 }
 
 .window-frame--mobile-focused {
-  border-color: rgba(235, 194, 125, 0.22);
+  border-color: rgba(198, 220, 203, 0.22);
 }
 
 .window-frame--maximized {
@@ -582,7 +562,7 @@ select {
   gap: 14px;
   padding: 14px 18px;
   background:
-    linear-gradient(180deg, rgba(35, 26, 20, 0.92), rgba(18, 17, 22, 0.76));
+    linear-gradient(180deg, rgba(22, 31, 26, 0.92), rgba(14, 18, 17, 0.78));
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   cursor: move;
   user-select: none;
@@ -613,8 +593,8 @@ select {
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.28), transparent 56%),
-    linear-gradient(180deg, rgba(58, 39, 25, 0.92), rgba(19, 20, 27, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.22), transparent 56%),
+    linear-gradient(180deg, rgba(31, 47, 39, 0.92), rgba(14, 18, 17, 0.96));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   font-size: 1.15rem;
 }
@@ -629,10 +609,10 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
   font-size: 1.02rem;
-  font-variation-settings: 'SOFT' 80;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   color: var(--shell-text-strong);
 }
 
@@ -662,7 +642,7 @@ select {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.18em;
-  text-transform: uppercase;
+  text-transform: none;
 }
 
 .window-frame__status--ready {
@@ -718,7 +698,7 @@ select {
 
 .window-frame__action-button--update {
   background:
-    linear-gradient(180deg, rgba(120, 84, 37, 0.92), rgba(84, 56, 24, 0.96));
+    linear-gradient(180deg, rgba(100, 134, 110, 0.92), rgba(59, 86, 68, 0.96));
 }
 
 .window-frame__content {
@@ -827,8 +807,8 @@ select {
   border-radius: 28px;
   border: 1px solid var(--shell-border);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(20, 17, 19, 0.9), rgba(10, 12, 18, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.1), transparent 30%),
+    linear-gradient(180deg, rgba(17, 23, 20, 0.9), rgba(10, 15, 13, 0.96));
   color: var(--shell-text-strong);
   text-align: center;
   text-wrap: balance;
@@ -844,10 +824,10 @@ select {
   min-height: 280px;
   overflow: hidden;
   border-radius: 28px;
-  border: 1px solid rgba(235, 194, 125, 0.2);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.24), transparent 24%),
-    linear-gradient(180deg, rgba(22, 18, 18, 0.98), rgba(11, 13, 20, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.2), transparent 24%),
+    linear-gradient(180deg, rgba(17, 23, 20, 0.98), rgba(10, 15, 13, 0.96));
   isolation: isolate;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
@@ -865,7 +845,7 @@ select {
   width: 34%;
   height: 42%;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(214, 161, 92, 0.34), transparent 72%);
+  background: radial-gradient(circle, rgba(168, 192, 172, 0.28), transparent 72%);
   animation: llm-generation-orb-float 16s ease-in-out infinite alternate;
 }
 
@@ -877,7 +857,7 @@ select {
 .llm-generation__ambient-orb--right {
   right: 4%;
   bottom: 10%;
-  background: radial-gradient(circle, rgba(113, 150, 168, 0.26), transparent 72%);
+  background: radial-gradient(circle, rgba(121, 153, 141, 0.22), transparent 72%);
   animation-duration: 18s;
 }
 
@@ -901,14 +881,15 @@ select {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.26em;
-  text-transform: uppercase;
-  color: rgba(255, 235, 196, 0.76);
+  text-transform: none;
+  color: rgba(227, 239, 229, 0.74);
 }
 
 .llm-generation__title {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
   font-size: clamp(22px, 2.8vw, 32px);
   line-height: 1.04;
+  font-weight: 700;
   color: var(--shell-text-strong);
   text-wrap: balance;
 }
@@ -927,7 +908,7 @@ select {
   padding: clamp(20px, 3.8vw, 30px) clamp(10px, 2vw, 18px);
   overflow: hidden;
   border-radius: 30px;
-  border: 1px solid rgba(235, 194, 125, 0.16);
+  border: 1px solid rgba(198, 220, 203, 0.14);
   background:
     linear-gradient(180deg, rgba(14, 12, 16, 0.94) 0%, rgba(10, 12, 18, 0.98) 100%);
   box-shadow:
@@ -946,8 +927,8 @@ select {
   filter: blur(8px);
   background: linear-gradient(
     180deg,
-    rgba(255, 225, 171, 0.44) 0%,
-    rgba(214, 161, 92, 0.12) 36%,
+    rgba(227, 239, 229, 0.26) 0%,
+    rgba(168, 192, 172, 0.1) 36%,
     rgba(255, 255, 255, 0) 100%
   );
   clip-path: polygon(30% 0, 70% 0, 100% 100%, 0 100%);
@@ -965,15 +946,15 @@ select {
   z-index: 2;
   height: 74px;
   border-radius: 24px;
-  border: 1px solid rgba(235, 194, 125, 0.22);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   background: linear-gradient(
     180deg,
-    rgba(214, 161, 92, 0.04) 0%,
-    rgba(214, 161, 92, 0.14) 48%,
-    rgba(214, 161, 92, 0.04) 100%
+    rgba(168, 192, 172, 0.04) 0%,
+    rgba(168, 192, 172, 0.12) 48%,
+    rgba(168, 192, 172, 0.04) 100%
   );
   transform: translateY(-50%);
-  box-shadow: 0 0 30px rgba(214, 161, 92, 0.12);
+  box-shadow: 0 0 30px rgba(168, 192, 172, 0.12);
   pointer-events: none;
 }
 
@@ -1025,7 +1006,7 @@ select {
   font-size: clamp(26px, 3vw, 34px);
   line-height: 1;
   opacity: 0.92;
-  filter: drop-shadow(0 0 12px rgba(214, 161, 92, 0.16));
+  filter: drop-shadow(0 0 12px rgba(168, 192, 172, 0.14));
 }
 
 .llm-generation__selection {
@@ -1039,7 +1020,7 @@ select {
   min-width: 240px;
   padding: 18px 24px;
   border-radius: 999px;
-  border: 1px solid rgba(235, 194, 125, 0.26);
+  border: 1px solid rgba(198, 220, 203, 0.22);
   background: rgba(11, 12, 18, 0.78);
   backdrop-filter: blur(18px);
   transform: translate(-50%, -50%);
@@ -1051,15 +1032,15 @@ select {
 .llm-generation__selection-emoji {
   font-size: clamp(42px, 7vw, 64px);
   line-height: 1;
-  text-shadow: 0 0 24px rgba(214, 161, 92, 0.22);
+  text-shadow: 0 0 24px rgba(168, 192, 172, 0.18);
 }
 
 .llm-generation__selection-label {
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 235, 196, 0.76);
+  text-transform: none;
+  color: rgba(227, 239, 229, 0.72);
 }
 
 .llm-generation__selection-name {
@@ -1105,7 +1086,7 @@ select {
   padding: 12px 18px 14px;
   background:
     linear-gradient(180deg, rgba(8, 10, 14, 0.24), rgba(8, 10, 14, 0.92) 38%),
-    linear-gradient(90deg, rgba(214, 161, 92, 0.08), transparent 30%, rgba(113, 150, 168, 0.08));
+    linear-gradient(90deg, rgba(168, 192, 172, 0.08), transparent 30%, rgba(116, 144, 132, 0.08));
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(20px) saturate(120%);
 }
@@ -1117,7 +1098,7 @@ select {
   right: 18px;
   top: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(235, 194, 125, 0.28), transparent);
+  background: linear-gradient(90deg, transparent, rgba(198, 220, 203, 0.24), transparent);
 }
 
 .taskbar__start,
@@ -1155,7 +1136,7 @@ select {
 .llm-output-dialog__button:focus-visible,
 .revision-dialog__close:focus-visible,
 .llm-output-dialog__close:focus-visible {
-  outline: 2px solid rgba(235, 194, 125, 0.6);
+  outline: 2px solid rgba(198, 220, 203, 0.54);
   outline-offset: 2px;
 }
 
@@ -1166,7 +1147,7 @@ select {
   padding: 4px;
   border-radius: 10px;
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.24), transparent 60%),
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.2), transparent 60%),
     rgba(255, 255, 255, 0.02);
 }
 
@@ -1177,10 +1158,10 @@ select {
 }
 
 .taskbar__start-copy strong {
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 1rem;
+  font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
+  font-size: 0.98rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
 }
 
 .taskbar__start-copy small {
@@ -1218,8 +1199,8 @@ select {
 .taskbar__window--active {
   border-color: var(--shell-border-strong);
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.14), transparent 50%),
-    linear-gradient(180deg, rgba(45, 33, 23, 0.94), rgba(16, 18, 27, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.12), transparent 50%),
+    linear-gradient(180deg, rgba(23, 34, 28, 0.94), rgba(12, 17, 15, 0.96));
 }
 
 .taskbar__window-icon {
@@ -1230,7 +1211,7 @@ select {
   flex: 0 0 auto;
   border-radius: 14px;
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.22), transparent 60%),
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.18), transparent 60%),
     rgba(255, 255, 255, 0.03);
   font-size: 1rem;
 }
@@ -1252,8 +1233,8 @@ select {
 
 .taskbar__status {
   font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-transform: none;
   color: var(--shell-muted);
 }
 
@@ -1461,8 +1442,9 @@ select {
 }
 
 .mobile-task-switcher__header strong {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
   font-size: 18px;
+  font-weight: 700;
   color: var(--shell-text-strong);
 }
 
@@ -1488,9 +1470,9 @@ select {
   gap: 12px;
   padding: 14px;
   border-radius: 30px;
-  border: 1px solid rgba(235, 194, 125, 0.16);
+  border: 1px solid rgba(198, 220, 203, 0.14);
   background:
-    linear-gradient(180deg, rgba(25, 21, 18, 0.94), rgba(11, 13, 20, 0.96));
+    linear-gradient(180deg, rgba(17, 25, 21, 0.94), rgba(10, 15, 13, 0.96));
   box-shadow: var(--shell-shadow-soft);
   transition: transform 160ms ease, opacity 160ms ease;
   touch-action: pan-y;
@@ -1507,8 +1489,8 @@ select {
   padding: 16px 10px;
   border-radius: 22px;
   background:
-    radial-gradient(circle at top, rgba(214, 161, 92, 0.16), transparent 40%),
-    linear-gradient(180deg, rgba(37, 28, 23, 0.95), rgba(14, 16, 24, 0.96));
+    radial-gradient(circle at top, rgba(168, 192, 172, 0.16), transparent 40%),
+    linear-gradient(180deg, rgba(22, 33, 27, 0.95), rgba(11, 16, 14, 0.96));
 }
 
 .mobile-task-card__icon {
@@ -1562,7 +1544,7 @@ select {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border: 1px solid rgba(235, 194, 125, 0.22);
+  border: 1px solid rgba(198, 220, 203, 0.2);
   border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(32, 25, 21, 0.92), rgba(14, 16, 24, 0.96));
@@ -1578,8 +1560,8 @@ select {
   height: 22px;
   border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(214, 161, 92, 0.96), rgba(131, 88, 39, 0.96));
-  color: #130d09;
+    linear-gradient(180deg, rgba(168, 192, 172, 0.96), rgba(99, 123, 107, 0.96));
+  color: #08100d;
   font-weight: 800;
 }
 
@@ -1614,7 +1596,7 @@ select {
   min-width: 196px;
   padding: 8px;
   border-radius: 20px;
-  border: 1px solid rgba(235, 194, 125, 0.24);
+  border: 1px solid rgba(198, 220, 203, 0.22);
   background:
     linear-gradient(180deg, rgba(24, 20, 18, 0.96), rgba(10, 12, 18, 0.96));
   backdrop-filter: blur(18px);
@@ -1634,7 +1616,7 @@ select {
 }
 
 .context-menu__item:hover {
-  background: rgba(214, 161, 92, 0.14);
+  background: rgba(168, 192, 172, 0.14);
   color: var(--shell-text-strong);
 }
 
@@ -1650,7 +1632,7 @@ select {
   display: grid;
   gap: 12px;
   border-radius: 28px;
-  border: 1px solid rgba(235, 194, 125, 0.2);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   background:
     linear-gradient(180deg, rgba(24, 20, 18, 0.96), rgba(10, 12, 18, 0.98));
   box-shadow: var(--shell-shadow);
@@ -1680,9 +1662,10 @@ select {
 .prompt-dialog__header strong,
 .revision-dialog__heading strong,
 .llm-output-dialog__heading strong {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Instrument Sans', 'Segoe UI', sans-serif;
   color: var(--shell-text-strong);
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
   line-height: 1.08;
 }
 
@@ -1724,7 +1707,7 @@ select {
   min-height: 140px;
   resize: vertical;
   border-radius: 22px;
-  border: 1px solid rgba(235, 194, 125, 0.16);
+  border: 1px solid rgba(198, 220, 203, 0.14);
   background:
     linear-gradient(180deg, rgba(11, 12, 18, 0.94), rgba(15, 17, 25, 0.94));
   color: var(--shell-text-strong);
@@ -1756,7 +1739,7 @@ select {
 .revision-dialog__button,
 .llm-output-dialog__button {
   border-radius: 999px;
-  border: 1px solid rgba(235, 194, 125, 0.18);
+  border: 1px solid rgba(198, 220, 203, 0.18);
   padding: 10px 16px;
   cursor: pointer;
   color: var(--shell-text-strong);
@@ -1768,8 +1751,8 @@ select {
 .revision-dialog__button:not(.revision-dialog__button--ghost):not(:disabled),
 .llm-output-dialog__button:not(.llm-output-dialog__button--ghost):not(:disabled) {
   background:
-    linear-gradient(180deg, rgba(175, 119, 48, 0.96), rgba(112, 72, 29, 0.96));
-  color: #130d09;
+    linear-gradient(180deg, rgba(168, 192, 172, 0.96), rgba(99, 123, 107, 0.96));
+  color: #08100d;
 }
 
 .prompt-dialog__button--ghost,
@@ -1817,7 +1800,7 @@ select {
   justify-content: space-between;
   gap: 12px;
   border-radius: 22px;
-  border: 1px solid rgba(235, 194, 125, 0.14);
+  border: 1px solid rgba(198, 220, 203, 0.14);
   background:
     linear-gradient(180deg, rgba(31, 24, 20, 0.82), rgba(12, 14, 21, 0.9));
   padding: 14px;
@@ -1862,8 +1845,8 @@ select {
 }
 
 .revision-dialog__badge {
-  background: rgba(214, 161, 92, 0.18);
-  border: 1px solid rgba(235, 194, 125, 0.24);
+  background: rgba(168, 192, 172, 0.16);
+  border: 1px solid rgba(198, 220, 203, 0.22);
   color: var(--shell-text-strong);
 }
 
@@ -1888,7 +1871,7 @@ select {
   display: grid;
   gap: 10px;
   border-radius: 24px;
-  border: 1px solid rgba(235, 194, 125, 0.14);
+  border: 1px solid rgba(198, 220, 203, 0.14);
   background:
     linear-gradient(180deg, rgba(12, 13, 20, 0.94), rgba(15, 17, 25, 0.94));
   padding: 14px;
@@ -1913,7 +1896,7 @@ select {
   margin: 0 !important;
   border-radius: 18px;
   padding: 18px !important;
-  border: 1px solid rgba(235, 194, 125, 0.14);
+  border: 1px solid rgba(198, 220, 203, 0.14);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
@@ -1977,7 +1960,7 @@ select {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.08),
       0 24px 54px rgba(0, 0, 0, 0.5),
-      0 0 38px rgba(214, 161, 92, 0.22);
+      0 0 38px rgba(168, 192, 172, 0.18);
   }
 }
 
@@ -2019,7 +2002,7 @@ select {
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.1),
       0 24px 58px rgba(0, 0, 0, 0.52),
-      0 0 40px rgba(214, 161, 92, 0.22);
+      0 0 40px rgba(168, 192, 172, 0.18);
   }
 }
 

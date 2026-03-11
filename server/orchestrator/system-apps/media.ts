@@ -232,7 +232,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           gap: 6,
           padding: '16px 18px',
           borderRadius: 24,
-          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
             'linear-gradient(145deg, rgba(26,22,18,0.92), rgba(15,18,29,0.94))',
           boxShadow: '0 24px 50px rgba(3,5,10,0.3)'
@@ -260,9 +260,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           style={{
             flex: 1,
             borderRadius: 18,
-            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background: 'rgba(17,20,31,0.86)',
-            color: 'var(--shell-text-strong, #fff7e5)',
+            color: 'var(--shell-text-strong, #f1f7f2)',
             padding: '12px 14px',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
           }}
@@ -275,10 +275,10 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           }}
           style={{
             borderRadius: 999,
-            border: '1px solid rgba(226,192,116,0.34)',
+            border: '1px solid rgba(168,192,172,0.32)',
             padding: '10px 16px',
-            background: 'linear-gradient(135deg, rgba(171,118,47,0.98), rgba(110,55,21,0.98))',
-            color: '#fff7e5',
+            background: 'linear-gradient(135deg, rgba(125,156,133,0.98), rgba(78,105,88,0.98))',
+            color: '#f1f7f2',
             cursor: 'pointer',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
@@ -323,7 +323,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               canWallpaper && activeSource
                 ? 'linear-gradient(135deg, rgba(60,119,79,0.96), rgba(31,82,54,0.96))'
                 : 'rgba(62,50,32,0.38)',
-            color: '#f7f3e8',
+            color: '#f1f7f2',
             cursor: canWallpaper && activeSource ? 'pointer' : 'not-allowed'
           }}
         >
@@ -337,10 +337,10 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           }}
           style={{
             borderRadius: 999,
-            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             padding: '10px 16px',
             background: 'rgba(15,18,29,0.6)',
-            color: 'var(--shell-text, #f4e7c8)',
+            color: 'var(--shell-text, #d9e6dd)',
             cursor: 'pointer'
           }}
         >
@@ -352,9 +352,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         style={{
           minHeight: 0,
           borderRadius: 30,
-          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
-            'radial-gradient(circle at top, rgba(188,145,76,0.08), transparent 34%), linear-gradient(180deg, rgba(8,10,17,0.94), rgba(10,13,22,0.96))',
+            'radial-gradient(circle at top, rgba(168,192,172,0.08), transparent 34%), linear-gradient(180deg, rgba(8,14,12,0.94), rgba(10,15,13,0.96))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
