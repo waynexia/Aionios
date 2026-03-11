@@ -17,7 +17,7 @@ export default {
     if (manifestInfo.href !== '/site.webmanifest') {
       throw new Error(`Unexpected manifest href: ${JSON.stringify(manifestInfo.href)}`);
     }
-    if (manifestInfo.themeColor !== '#020617') {
+    if (manifestInfo.themeColor !== '#08070d') {
       throw new Error(`Unexpected theme color: ${JSON.stringify(manifestInfo.themeColor)}`);
     }
     if (manifestInfo.appleCapable !== 'yes') {
@@ -29,7 +29,9 @@ export default {
       manifest.display !== 'standalone' ||
       manifest.start_url !== '/' ||
       manifest.scope !== '/' ||
-      manifest.id !== '/'
+      manifest.id !== '/' ||
+      manifest.background_color !== '#08070d' ||
+      manifest.theme_color !== '#08070d'
     ) {
       throw new Error(`Unexpected manifest payload: ${JSON.stringify(manifest)}`);
     }

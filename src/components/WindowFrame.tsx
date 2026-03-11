@@ -21,6 +21,7 @@ function clamp(value: number, min: number, max: number) {
 
 interface WindowFrameProps {
   windowItem: DesktopWindow;
+  windowIcon?: string;
   showRevision?: boolean;
   focused: boolean;
   mobileMode?: boolean;
@@ -37,6 +38,7 @@ interface WindowFrameProps {
 
 export function WindowFrame({
   windowItem,
+  windowIcon,
   showRevision = true,
   focused,
   mobileMode = false,
@@ -191,16 +193,29 @@ export function WindowFrame({
         onDoubleClick={mobileMode ? undefined : () => onToggleMaximize()}
         onPointerDown={mobileMode ? undefined : (event) => startInteraction(event, 'move')}
       >
-        <div className="window-frame__title">
-          <span>{windowItem.title}</span>
-          <small>
-            {showRevision ? `${windowItem.appId} · rev ${windowItem.revision}` : windowItem.appId}
-          </small>
+        <div className="window-frame__titlebar">
+          <span className="window-frame__app-icon" aria-hidden="true">
+            {windowIcon ?? windowItem.generationSelection?.emoji ?? '[]'}
+          </span>
+          <div className="window-frame__title">
+            <span>{windowItem.title}</span>
+            <small>
+              {showRevision ? `${windowItem.appId} · rev ${windowItem.revision}` : windowItem.appId}
+            </small>
+          </div>
         </div>
-        <div className="window-frame__actions">
+        <div className="window-frame__chrome">
+          <span
+            className={`window-frame__status window-frame__status--${windowItem.status}`}
+            data-window-status={windowItem.status}
+          >
+            {windowItem.status}
+          </span>
+          <div className="window-frame__actions">
           {onRequestHistory ? (
             <button
               type="button"
+              className="window-frame__action-button window-frame__action-button--history"
               disabled={windowItem.status === 'loading'}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => onRequestHistory()}
@@ -217,6 +232,7 @@ export function WindowFrame({
           {onRequestLlmOutput ? (
             <button
               type="button"
+              className="window-frame__action-button window-frame__action-button--output"
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => onRequestLlmOutput()}
               aria-label="Show LLM output"
@@ -228,6 +244,7 @@ export function WindowFrame({
           {onRequestUpdate ? (
             <button
               type="button"
+              className="window-frame__action-button window-frame__action-button--update"
               disabled={windowItem.status === 'loading'}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={() => onRequestUpdate()}
@@ -241,6 +258,7 @@ export function WindowFrame({
             <>
               <button
                 type="button"
+                className="window-frame__action-button window-frame__action-button--minimize"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={onMinimize}
                 aria-label="Minimize window"
@@ -249,6 +267,7 @@ export function WindowFrame({
               </button>
               <button
                 type="button"
+                className="window-frame__action-button window-frame__action-button--maximize"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={onToggleMaximize}
                 aria-label={windowItem.maximized ? 'Restore window' : 'Maximize window'}
@@ -257,6 +276,7 @@ export function WindowFrame({
               </button>
               <button
                 type="button"
+                className="window-frame__action-button window-frame__action-button--close"
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={onClose}
                 aria-label="Close window"
@@ -265,6 +285,7 @@ export function WindowFrame({
               </button>
             </>
           )}
+          </div>
         </div>
       </header>
       <section className="window-frame__content">{children}</section>

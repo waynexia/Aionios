@@ -228,6 +228,12 @@ export default function App() {
     [desktopPersistedAppDefinitions]
   );
 
+  const getWindowIcon = useCallback(
+    (windowItem: { appId: string; generationSelection?: { emoji: string } }) =>
+      windowItem.generationSelection?.emoji ?? resolveAppDefinition(windowItem.appId)?.icon ?? '🧩',
+    [resolveAppDefinition]
+  );
+
   const mobileVisibleWindowId =
     isCompactViewport && mobileSurface === 'app'
       ? getRenderableMobileWindowId(
@@ -747,6 +753,7 @@ export default function App() {
               <WindowFrame
                 key={windowItem.windowId}
                 windowItem={windowItem}
+                windowIcon={getWindowIcon(windowItem)}
                 showRevision={definition?.kind !== 'system'}
                 focused={windowItem.windowId === state.focusedWindowId}
                 mobileMode={isCompactViewport}
@@ -855,6 +862,7 @@ export default function App() {
         <Taskbar
           windows={orderedWindows}
           focusedWindowId={state.focusedWindowId}
+          getWindowIcon={getWindowIcon}
           onStartClick={openTaskbarCreateDialog}
           onWindowClick={(windowId) => focusWindow(windowId)}
         />

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 interface TaskbarProps {
   windows: DesktopWindow[];
   focusedWindowId?: string;
+  getWindowIcon: (windowItem: DesktopWindow) => string;
   onStartClick: () => void;
   onWindowClick: (windowId: string) => void;
 }
@@ -45,7 +46,13 @@ function TaskbarClock() {
   );
 }
 
-export function Taskbar({ windows, focusedWindowId, onStartClick, onWindowClick }: TaskbarProps) {
+export function Taskbar({
+  windows,
+  focusedWindowId,
+  getWindowIcon,
+  onStartClick,
+  onWindowClick
+}: TaskbarProps) {
   return (
     <footer className="taskbar">
       <button
@@ -58,7 +65,10 @@ export function Taskbar({ windows, focusedWindowId, onStartClick, onWindowClick 
         }}
       >
         <img className="taskbar__start-icon" src="/icons/icon-white-48x48.png" alt="" />
-        <span>Aionios</span>
+        <span className="taskbar__start-copy">
+          <strong>Aionios</strong>
+          <small>Control Room</small>
+        </span>
       </button>
       <div className="taskbar__windows">
         {windows.map((windowItem) => (
@@ -71,9 +81,14 @@ export function Taskbar({ windows, focusedWindowId, onStartClick, onWindowClick 
             data-app-id={windowItem.appId}
             onClick={() => onWindowClick(windowItem.windowId)}
           >
-            <span>{windowItem.title}</span>
-            <span className="taskbar__status" data-taskbar-status>
-              {windowItem.status}
+            <span className="taskbar__window-icon" aria-hidden="true">
+              {getWindowIcon(windowItem)}
+            </span>
+            <span className="taskbar__window-copy">
+              <span className="taskbar__window-title">{windowItem.title}</span>
+              <span className="taskbar__status" data-taskbar-status>
+                {windowItem.status}
+              </span>
             </span>
           </button>
         ))}

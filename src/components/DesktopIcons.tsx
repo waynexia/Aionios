@@ -286,8 +286,10 @@ export function DesktopIcons({
               onContextMenu={() => onIconContextMenu(app.appId)}
               title={`${app.title} — ${app.hint}`}
             >
+              <span className="desktop-icon__glow" aria-hidden="true" />
               <span className="desktop-icon__emoji">{app.icon}</span>
               <span className="desktop-icon__label">{app.title}</span>
+              <span className="desktop-icon__hint">{app.hint}</span>
             </button>
           );
         })}
@@ -328,8 +330,10 @@ export function DesktopIcons({
             onContextMenu={() => onIconContextMenu(app.appId)}
             title={`${app.title} — ${app.hint}`}
           >
+            <span className="desktop-icon__glow" aria-hidden="true" />
             <span className="desktop-icon__emoji">{app.icon}</span>
             <span className="desktop-icon__label">{app.title}</span>
+            <span className="desktop-icon__hint">{app.hint}</span>
           </button>
         );
       })}

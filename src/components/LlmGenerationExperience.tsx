@@ -54,6 +54,10 @@ export function LlmGenerationExperience({
     phase === 'completing'
       ? selectedFileName?.trim() || targetTitle
       : 'Evaluating names and icons';
+  const copy =
+    phase === 'loading'
+      ? 'Cataloging title, icon, and runtime shape before the window is mounted.'
+      : 'The shell is locking the selected identity into this window.';
 
   return (
     <section
@@ -71,11 +75,9 @@ export function LlmGenerationExperience({
 
       <div className="llm-generation__panel">
         <header className="llm-generation__header">
-          <span className="llm-generation__eyebrow">LLM Generation</span>
+          <span className="llm-generation__eyebrow">Window Fabrication</span>
           <strong className="llm-generation__title">{titleLabel}</strong>
-          <p className="llm-generation__copy">
-            Slow reels keep motion readable during longer generation runs.
-          </p>
+          <p className="llm-generation__copy">{copy}</p>
         </header>
 
         <div className="llm-generation__machine" aria-hidden="true">

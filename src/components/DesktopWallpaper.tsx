@@ -28,6 +28,7 @@ export function DesktopWallpaper({ wallpaper }: DesktopWallpaperProps) {
 
   return (
     <div className="desktop-wallpaper" data-desktop-wallpaper data-kind={wallpaper.kind}>
+      <div className="desktop-wallpaper__atmosphere" aria-hidden="true" />
       {wallpaper.kind === 'image' ? (
         <img
           data-desktop-wallpaper-image
@@ -50,8 +51,13 @@ export function DesktopWallpaper({ wallpaper }: DesktopWallpaperProps) {
           disablePictureInPicture
         />
       )}
+      <div className="desktop-wallpaper__grid" aria-hidden="true" />
+      <div className="desktop-wallpaper__horizon" aria-hidden="true" />
       <div className="desktop-wallpaper__overlay" aria-hidden="true" />
+      <div className="desktop-wallpaper__brandmark" aria-hidden="true">
+        <span>Aionios</span>
+        <small>Editorial Control Room</small>
+      </div>
     </div>
   );
 }
-
