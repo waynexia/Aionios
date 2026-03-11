@@ -357,10 +357,13 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       style={{
         display: 'grid',
         gridTemplateRows: '1fr auto',
-        gap: 10,
+        gap: 14,
         height: '100%',
         minHeight: 0,
-        padding: 10
+        padding: 14,
+        background:
+          'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 28%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
+        color: 'var(--shell-text, #f4e7c8)'
       }}
       onPointerDown={(event) => {
         const target = event.target instanceof Element ? event.target : null;
@@ -383,12 +386,24 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         setSelectedPath(null);
       }}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.2fr) minmax(280px, 1fr)', gap: 12, minHeight: 0 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(320px, 1.2fr) minmax(280px, 1fr)',
+          gap: 14,
+          minHeight: 0
+        }}
+      >
         <section
           data-directory-list
           style={{
             overflow: 'auto',
-            padding: 4
+            padding: 14,
+            borderRadius: 28,
+            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            background:
+              'linear-gradient(180deg, rgba(18,16,15,0.9), rgba(9,12,20,0.92))',
+            boxShadow: '0 24px 50px rgba(3,5,10,0.28)'
           }}
           onPointerDown={(event) => {
             const target = event.target instanceof Element ? event.target : null;
@@ -399,17 +414,36 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           }}
         >
           {loadingList ? (
-            <p style={{ margin: 0, fontSize: 12, color: '#bfdbfe' }}>Loading files...</p>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-accent, #e0b45d)' }}>
+              Loading files...
+            </p>
           ) : files.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>No files yet. Right-click to create one.</p>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: 'var(--shell-muted, rgba(244,231,200,0.72))'
+              }}
+            >
+              No files yet. Right-click to create one.
+            </p>
           ) : (
             groups.map((group) => (
               <div
                 key={group.directory}
                 data-directory-group={group.directory}
-                style={{ display: 'grid', gap: 8, marginBottom: 14 }}
+                style={{ display: 'grid', gap: 10, marginBottom: 18 }}
               >
-                <strong style={{ fontSize: 12, color: '#93c5fd' }}>{group.directory}</strong>
+                <strong
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'var(--shell-accent, #e0b45d)'
+                  }}
+                >
+                  {group.directory}
+                </strong>
                 <div className="icon-grid">
                   {group.files.map((file) => {
                     const isSelected = file.path === selectedPath;
@@ -452,31 +486,59 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         <section
           style={{
             display: 'grid',
-            gap: 10,
+            gap: 12,
             minHeight: 0,
-            paddingLeft: 12,
-            borderLeft: '1px solid rgba(148,163,184,0.22)'
+            padding: 16,
+            borderRadius: 28,
+            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            background:
+              'linear-gradient(180deg, rgba(10,12,20,0.96), rgba(18,16,20,0.94))',
+            boxShadow: '0 24px 50px rgba(3,5,10,0.28)'
           }}
         >
-          <label style={{ display: 'grid', gap: 4, fontSize: 12 }}>
-            <span>Path</span>
+          <div style={{ display: 'grid', gap: 4 }}>
+            <strong style={{ fontSize: 17, letterSpacing: '0.04em' }}>Inspector</strong>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                lineHeight: 1.6,
+                color: 'var(--shell-muted, rgba(244,231,200,0.72))'
+              }}
+            >
+              Compose a new file or revise the selected entry before saving it back to the host.
+            </p>
+          </div>
+
+          <label style={{ display: 'grid', gap: 6, fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            <span style={{ color: 'var(--shell-accent, #e0b45d)' }}>Path</span>
             <input
               data-directory-path
               value={draftPath}
               disabled={saving}
               onChange={(event) => setDraftPath(event.target.value)}
               style={{
-                borderRadius: 8,
-                border: '1px solid rgba(148,163,184,0.4)',
-                background: 'rgba(15,23,42,0.85)',
-                color: '#e2e8f0',
-                padding: '8px 10px'
+                borderRadius: 18,
+                border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+                background: 'rgba(17,20,31,0.86)',
+                color: 'var(--shell-text-strong, #fff7e5)',
+                padding: '12px 14px',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
               }}
             />
           </label>
 
-          <label style={{ display: 'grid', gap: 4, fontSize: 12, minHeight: 0 }}>
-            <span>Preview / Editor</span>
+          <label
+            style={{
+              display: 'grid',
+              gap: 6,
+              fontSize: 11,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              minHeight: 0
+            }}
+          >
+            <span style={{ color: 'var(--shell-accent, #e0b45d)' }}>Preview / Editor</span>
             <textarea
               data-directory-content
               value={draftContent}
@@ -486,21 +548,32 @@ export default function WindowApp({ host, windowState }: WindowProps) {
                 width: '100%',
                 flex: 1,
                 minHeight: 180,
-                borderRadius: 8,
-                border: '1px solid rgba(148,163,184,0.4)',
-                background: 'rgba(15,23,42,0.85)',
-                color: '#e2e8f0',
-                padding: '8px 10px',
+                borderRadius: 24,
+                border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+                background: 'rgba(11,14,24,0.92)',
+                color: 'var(--shell-text-strong, #fff7e5)',
+                padding: '16px 18px',
                 resize: 'vertical',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                fontSize: 12
+                fontSize: 12,
+                lineHeight: 1.6,
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
               }}
             />
           </label>
         </section>
       </div>
 
-      <footer style={{ display: 'grid', gap: 6 }}>
+      <footer
+        style={{
+          display: 'grid',
+          gap: 8,
+          padding: '12px 14px',
+          borderRadius: 24,
+          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          background: 'rgba(10,13,22,0.82)'
+        }}
+      >
         <button
           data-directory-save
           type="button"
@@ -510,20 +583,34 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           }}
           style={{
             justifySelf: 'start',
-            borderRadius: 8,
-            border: 0,
-            padding: '8px 12px',
-            background: canSave ? '#2563eb' : '#1e293b',
-            color: '#f8fafc',
+            borderRadius: 999,
+            border: '1px solid rgba(226,192,116,0.34)',
+            padding: '10px 16px',
+            background: canSave
+              ? 'linear-gradient(135deg, rgba(171,118,47,0.98), rgba(110,55,21,0.98))'
+              : 'rgba(62,50,32,0.38)',
+            color: '#fff7e5',
             cursor: canSave ? 'pointer' : 'default'
           }}
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
-        <p style={{ margin: 0, fontSize: 12, color: error ? '#fecaca' : '#bbf7d0' }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: error
+              ? 'var(--shell-danger, #f4a6a1)'
+              : 'var(--shell-success, #9bc9ac)'
+          }}
+        >
           {loadingFile ? 'Reading selected file...' : statusMessage}
         </p>
-        {error ? <p style={{ margin: 0, fontSize: 12, color: '#fecaca' }}>{error}</p> : null}
+        {error ? (
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-danger, #f4a6a1)' }}>
+            {error}
+          </p>
+        ) : null}
         <span data-directory-selected style={{ display: 'none' }}>{selectedLabel}</span>
       </footer>
     </div>

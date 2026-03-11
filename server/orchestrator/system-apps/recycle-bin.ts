@@ -249,17 +249,26 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       style={{
         display: 'grid',
         gridTemplateRows: '1fr auto',
-        gap: 10,
+        gap: 14,
         height: '100%',
         minHeight: 0,
-        padding: 10
+        padding: 14,
+        background:
+          'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 28%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
+        color: 'var(--shell-text, #f4e7c8)'
       }}
     >
       <section
         data-recycle-bin-list
         style={{
           overflow: 'auto',
-          minHeight: 0
+          minHeight: 0,
+          padding: 14,
+          borderRadius: 28,
+          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          background:
+            'linear-gradient(180deg, rgba(18,16,15,0.9), rgba(9,12,20,0.92))',
+          boxShadow: '0 24px 50px rgba(3,5,10,0.28)'
         }}
         onPointerDown={(event) => {
           const target = event.target instanceof Element ? event.target : null;
@@ -270,9 +279,17 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         }}
       >
         {loading ? (
-          <p style={{ margin: 0, fontSize: 12, color: '#bfdbfe' }}>Loading...</p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-accent, #e0b45d)' }}>
+            Loading...
+          </p>
         ) : items.length === 0 ? (
-          <p style={{ margin: 0, fontSize: 12, color: '#cbd5e1' }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: 'var(--shell-muted, rgba(244,231,200,0.72))'
+            }}
+          >
             Recycle bin is empty.
           </p>
         ) : (
@@ -300,11 +317,33 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         )}
       </section>
 
-      <footer style={{ display: 'grid', gap: 6 }}>
-        <p data-recycle-bin-status style={{ margin: 0, fontSize: 12, color: error ? '#fecaca' : '#bbf7d0' }}>
+      <footer
+        style={{
+          display: 'grid',
+          gap: 8,
+          padding: '12px 14px',
+          borderRadius: 24,
+          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          background: 'rgba(10,13,22,0.82)'
+        }}
+      >
+        <p
+          data-recycle-bin-status
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: error
+              ? 'var(--shell-danger, #f4a6a1)'
+              : 'var(--shell-success, #9bc9ac)'
+          }}
+        >
           {status}
         </p>
-        {error ? <p style={{ margin: 0, fontSize: 12, color: '#fecaca' }}>{error}</p> : null}
+        {error ? (
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--shell-danger, #f4a6a1)' }}>
+            {error}
+          </p>
+        ) : null}
       </footer>
     </div>
   );

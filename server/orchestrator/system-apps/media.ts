@@ -213,12 +213,44 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const canWallpaper = activeKind === 'image' || activeKind === 'video';
 
   return (
-    <div data-media-app style={{ display: 'grid', gridTemplateRows: 'auto auto auto 1fr', gap: 10, height: '100%' }}>
-      <header>
-        <strong>{windowState.title}</strong>
-        <p style={{ margin: '4px 0 0', fontSize: 12, opacity: 0.8 }}>Open host files or paste any media URL.</p>
+    <div
+      data-media-app
+      style={{
+        display: 'grid',
+        gridTemplateRows: 'auto auto auto 1fr',
+        gap: 14,
+        height: '100%',
+        padding: 14,
+        background:
+          'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 30%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
+        color: 'var(--shell-text, #f4e7c8)'
+      }}
+    >
+      <header
+        style={{
+          display: 'grid',
+          gap: 6,
+          padding: '16px 18px',
+          borderRadius: 24,
+          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          background:
+            'linear-gradient(145deg, rgba(26,22,18,0.92), rgba(15,18,29,0.94))',
+          boxShadow: '0 24px 50px rgba(3,5,10,0.3)'
+        }}
+      >
+        <strong style={{ fontSize: 18, letterSpacing: '0.04em' }}>{windowState.title}</strong>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            lineHeight: 1.6,
+            color: 'var(--shell-muted, rgba(244,231,200,0.72))'
+          }}
+        >
+          Load host media or paste a direct URL, then project it onto the shell wallpaper when needed.
+        </p>
       </header>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 10 }}>
         <input
           data-media-source
           list="media-source-options"
@@ -227,11 +259,12 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           placeholder="e.g. /photos/cat.jpg or https://example.com/song.mp3"
           style={{
             flex: 1,
-            borderRadius: 8,
-            border: '1px solid rgba(148,163,184,0.4)',
-            background: 'rgba(15,23,42,0.85)',
-            color: '#e2e8f0',
-            padding: '8px 10px'
+            borderRadius: 18,
+            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            background: 'rgba(17,20,31,0.86)',
+            color: 'var(--shell-text-strong, #fff7e5)',
+            padding: '12px 14px',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
           }}
         />
         <button
@@ -241,12 +274,16 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             void loadSource();
           }}
           style={{
-            borderRadius: 8,
-            border: 0,
-            padding: '8px 12px',
-            background: '#2563eb',
-            color: '#f8fafc',
-            cursor: 'pointer'
+            borderRadius: 999,
+            border: '1px solid rgba(226,192,116,0.34)',
+            padding: '10px 16px',
+            background: 'linear-gradient(135deg, rgba(171,118,47,0.98), rgba(110,55,21,0.98))',
+            color: '#fff7e5',
+            cursor: 'pointer',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            fontSize: 11,
+            fontWeight: 700
           }}
         >
           Load
@@ -257,7 +294,13 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           ))}
         </datalist>
       </div>
-      <p style={{ margin: 0, fontSize: 12, color: '#bfdbfe' }}>
+      <p
+        style={{
+          margin: 0,
+          fontSize: 12,
+          color: 'var(--shell-muted, rgba(244,231,200,0.72))'
+        }}
+      >
         {mediaFiles.length > 0 ? 'Host media files: ' + mediaFiles.join(', ') : 'No host media files detected.'}
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -273,11 +316,14 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             void updateWallpaper({ kind: activeKind, source: activeSource } as WallpaperState);
           }}
           style={{
-            borderRadius: 8,
-            border: 0,
-            padding: '8px 12px',
-            background: canWallpaper && activeSource ? '#16a34a' : 'rgba(148,163,184,0.25)',
-            color: '#f8fafc',
+            borderRadius: 999,
+            border: '1px solid rgba(152,199,164,0.3)',
+            padding: '10px 16px',
+            background:
+              canWallpaper && activeSource
+                ? 'linear-gradient(135deg, rgba(60,119,79,0.96), rgba(31,82,54,0.96))'
+                : 'rgba(62,50,32,0.38)',
+            color: '#f7f3e8',
             cursor: canWallpaper && activeSource ? 'pointer' : 'not-allowed'
           }}
         >
@@ -290,11 +336,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             void updateWallpaper(null);
           }}
           style={{
-            borderRadius: 8,
-            border: '1px solid rgba(148,163,184,0.35)',
-            padding: '8px 12px',
-            background: 'transparent',
-            color: '#e2e8f0',
+            borderRadius: 999,
+            border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+            padding: '10px 16px',
+            background: 'rgba(15,18,29,0.6)',
+            color: 'var(--shell-text, #f4e7c8)',
             cursor: 'pointer'
           }}
         >
@@ -305,23 +351,56 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         data-media-player
         style={{
           minHeight: 0,
-          borderRadius: 10,
-          border: '1px solid rgba(148,163,184,0.35)',
-          background: 'rgba(2,6,23,0.85)',
+          borderRadius: 30,
+          border: '1px solid var(--shell-border, rgba(201,171,102,0.24))',
+          background:
+            'radial-gradient(circle at top, rgba(188,145,76,0.08), transparent 34%), linear-gradient(180deg, rgba(8,10,17,0.94), rgba(10,13,22,0.96))',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 10,
-          overflow: 'auto'
+          padding: 18,
+          overflow: 'auto',
+          boxShadow: '0 24px 50px rgba(3,5,10,0.32)'
         }}
       >
         {activeKind === 'image' ? (
-          <img src={activeSource} alt={sourceInput || 'media image'} style={{ maxWidth: '100%', maxHeight: '100%' }} />
+          <img
+            src={activeSource}
+            alt={sourceInput || 'media image'}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              borderRadius: 22,
+              boxShadow: '0 26px 70px rgba(0,0,0,0.34)'
+            }}
+          />
         ) : null}
-        {activeKind === 'audio' ? <audio src={activeSource} controls style={{ width: '100%' }} /> : null}
-        {activeKind === 'video' ? <video src={activeSource} controls style={{ width: '100%', maxHeight: '100%' }} /> : null}
+        {activeKind === 'audio' ? (
+          <audio src={activeSource} controls style={{ width: '100%', filter: 'sepia(0.22)' }} />
+        ) : null}
+        {activeKind === 'video' ? (
+          <video
+            src={activeSource}
+            controls
+            style={{
+              width: '100%',
+              maxHeight: '100%',
+              borderRadius: 22,
+              boxShadow: '0 26px 70px rgba(0,0,0,0.34)'
+            }}
+          />
+        ) : null}
         {!activeKind ? (
-          <p style={{ margin: 0, fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>{status}</p>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12,
+              color: 'var(--shell-muted, rgba(244,231,200,0.72))',
+              textAlign: 'center'
+            }}
+          >
+            {status}
+          </p>
         ) : null}
       </section>
     </div>

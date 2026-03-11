@@ -29,15 +29,21 @@ function resolveWebSocketUrl(host: WindowProps['host']) {
 
 function resolveThemeColors() {
   const styles = getComputedStyle(document.documentElement);
-  const fallbackBackground = '#020617';
-  const fallbackForeground = '#e2e8f0';
-  const background = styles.backgroundColor && styles.backgroundColor !== 'rgba(0, 0, 0, 0)'
-    ? styles.backgroundColor
-    : fallbackBackground;
+  const fallbackBackground = '#0d1019';
+  const fallbackForeground = '#f6ebd0';
+  const background =
+    styles.getPropertyValue('--terminal-background').trim() ||
+    (styles.backgroundColor && styles.backgroundColor !== 'rgba(0, 0, 0, 0)'
+      ? styles.backgroundColor
+      : fallbackBackground);
+  const foreground =
+    styles.getPropertyValue('--terminal-foreground').trim() || styles.color || fallbackForeground;
+  const selectionBackground =
+    styles.getPropertyValue('--terminal-selection').trim() || 'rgba(201, 171, 102, 0.28)';
   return {
     background,
-    foreground: styles.color || fallbackForeground,
-    selectionBackground: 'rgba(148, 163, 184, 0.35)'
+    foreground,
+    selectionBackground
   };
 }
 
@@ -74,7 +80,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     const terminal = new Terminal({
       cursorBlink: true,
       fontFamily:
-        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        '"IBM Plex Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       fontSize: 13,
       theme: {
         background,
@@ -226,7 +232,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           flex: 1,
           minHeight: 0,
           overflow: 'hidden',
-          background: '#020617'
+          background: 'var(--terminal-background, #0d1019)'
         }}
       />
     </div>
