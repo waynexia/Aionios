@@ -1,5 +1,55 @@
 # Aionios Implementation Log
 
+## 2026-03-12 — Full frontend redesign, multi-pass
+
+### Design Direction
+
+- Tone: neo-noir editorial workstation with lacquered dark surfaces, warm metal accents, instrument-panel chrome, and dramatic atmospheric layering.
+- Goal: redesign the entire shell so the desktop feels authored and memorable while preserving all existing runtime behavior, data hooks, and mobile flows.
+- Memorable motif: orbital/glass workspace with luminous dock, sculpted icon plaques, and control-room window frames.
+
+### Task Breakdown
+
+1. Audit all current frontend surfaces and CSS coupling points.
+2. Redesign the global visual system: typography, tokens, wallpaper treatment, shell framing, and responsive layout primitives.
+3. Redesign core desktop surfaces: icons, window frames, taskbar, and chrome states.
+4. Redesign secondary surfaces: context menu, prompt/revision/output dialogs, and shared button/field treatments.
+5. Redesign compact/mobile surfaces: status bar, nav, recents, home action, and mobile window presentation.
+6. Run lint, unit tests, static checks, and end-to-end Chrome CDP verification; record results.
+7. Organize the redesign into tidy conventional commits.
+
+### Progress
+
+- [x] Step 1 complete — reviewed project description, shell architecture, styling surface area, and overlay/mobile coupling selectors.
+- [x] Step 2 complete — replaced the global visual system with an editorial neo-noir token set, new typography, atmospheric wallpaper treatment, and responsive shell layout.
+- [x] Step 3 complete — redesigned desktop icons, taskbar, window chrome, runtime states, and loading/generation experience.
+- [x] Step 4 complete — redesigned context menu, prompt/revision/output dialogs, and shared shell controls.
+- [x] Step 5 complete — redesigned compact/mobile status, navigation, task switcher, and home action; aligned built-in system app surfaces with shared shell tokens.
+- [x] Step 6 complete — `npm run check` passed and Chrome/CDP verification confirmed the redesigned shell and window chrome render in a real browser.
+- [ ] Step 7 in progress — organizing the redesign into conventional commits.
+
+### Pass Notes
+
+- Pass 1 — established the new design language with `Fraunces` + `Instrument Sans`, warm brass accents, darker lacquered panels, and orbital wallpaper overlays.
+- Pass 2 — upgraded shell chrome markup to support branded taskbar pills, window identity/status indicators, atmospheric wallpaper layers, and richer icon presentation.
+- Pass 3 — extended the redesign into directory, editor, media, recycle bin, and terminal surfaces via shared `--shell-*` variables so built-in apps inherit the same visual system.
+
+### Validation
+
+- `npm run check`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS (24 files, 110 tests)
+  - `npm run typecheck`: PASS
+- Chrome CDP runtime verification: PASS
+  - Chrome launched with `--remote-debugging-port=9222`
+  - `http://localhost:9222/json`: PASS
+  - Verified live shell evidence: redesigned taskbar gradient, icon hints, desktop icon `border-radius: 26px`
+  - Verified live window evidence: opened `Directory`, status `ready`, redesigned titlebar present, window `border-radius: 30px`
+  - Temp dir: `/tmp/aionios-runtime-verify-KqtUeu`
+  - Follow-up notes:
+    - dev server still logs `WebSocket server error: Port is already in use` during startup
+    - CDP target selection is brittle because Chrome first exposes a `?pwa-control=1` page target
+
 ## Task Breakdown
 
 1. Scaffold React + Vite + TypeScript workspace.
