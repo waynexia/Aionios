@@ -292,6 +292,36 @@
   - Logs: `/tmp/aionios-cdp-MRGWj9/logs`
   - Final-state payload: `{ windows: 11, icons: 10, preferenceStatus: 'Preferences loaded.' }`
 
+## 2026-03-12 — PWA support + installability verification
+
+### Task Breakdown
+
+1. Review the existing manifest/static assets/server path behavior to identify the missing PWA pieces.
+2. Add a real service worker with shell/runtime caching that does not break the current dev-hosted flow.
+3. Register the service worker on the client and tighten manifest/meta tags for installability.
+4. Add focused unit coverage for PWA registration helpers where practical.
+5. Add Chrome CDP verification for manifest + service worker readiness/control, then rerun the full validation suite.
+
+### Progress
+
+- [x] Step 1 complete — confirmed the project already had a basic `site.webmanifest` and icons, but no service worker, no client registration, and no installability/runtime verification path.
+- [x] Step 2 complete — added a root-scoped service worker with shell asset precaching, runtime same-origin caching, and safe activation/update behavior that avoids intercepting API/WebSocket traffic.
+- [x] Step 3 complete — registered the service worker on the client, expanded installability metadata in `index.html`, and tightened the web manifest with `id`, `scope`, and descriptive metadata.
+- [x] Step 4 complete — added focused unit coverage for the PWA registration support guard.
+- [x] Step 5 complete — added Chrome CDP `pwa-shell` verification for manifest/service worker/cache readiness and re-ran the full validation suite successfully.
+
+### Validation
+
+- `npm run lint`: PASS
+- `npm run test`: PASS (24 files, 110 tests)
+- `npm run typecheck`: PASS
+- `npm run verify:cdp -- --case pwa-shell`: PASS
+  - Temp dir: `/tmp/aionios-cdp-gpGuIx`
+  - Logs: `/tmp/aionios-cdp-gpGuIx/logs`
+- `npm run verify:cdp`: PASS
+  - Temp dir: `/tmp/aionios-cdp-T5VAtY`
+  - Logs: `/tmp/aionios-cdp-T5VAtY/logs`
+
 ### Validation
 
 - `npm run lint`: PASS (exit 0)

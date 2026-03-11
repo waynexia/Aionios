@@ -1,8 +1,12 @@
 {
   "name": "Aionios Desktop",
   "short_name": "Aionios",
+  "description": "A stable desktop shell with dynamic per-window apps and mobile-adaptive navigation.",
+  "id": "/",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#020617",
   "theme_color": "#020617",
   "icons": [
