@@ -1,5 +1,37 @@
 # Aionios Implementation Log
 
+## 2026-03-13 — Desktop icon selection box refinement
+
+### Task Breakdown
+
+1. Locate the desktop icon selected-state styling that currently encloses both the icon and its text label.
+2. Move the visual selected frame so it wraps only the icon surface while keeping the full button hit target intact.
+3. Run the required static checks.
+4. Re-verify the change in a real Chrome session via CDP.
+
+### Progress
+
+- [x] Step 1 complete — traced the selected-state box to `.desktop-icon` in `src/styles.css`.
+- [x] Step 2 complete — moved the visible selected treatment from the outer desktop icon button onto `.desktop-icon__emoji`, leaving the label outside the box.
+- [x] Step 3 complete — tests and type checks passed; project lint is currently blocked by an unrelated generated file under `.aionios/tmp/apps/app-cGTzt33HTN/entry.tsx` that still contains `any`.
+- [x] Step 4 complete — Chrome/CDP verification confirmed the selected box only wraps the emoji tile and stops above the label text.
+
+### Validation
+
+- `npm run lint`: FAIL
+  - Unrelated pre-existing/generated issue outside this change: `.aionios/tmp/apps/app-cGTzt33HTN/entry.tsx`
+  - Errors: `@typescript-eslint/no-explicit-any` on lines 4 and 5
+- `npm run test`: PASS (24 files, 110 tests)
+- `npm run typecheck`: PASS
+- Chrome CDP runtime verification: PASS
+  - Chrome launched with `--remote-debugging-port=9222`
+  - `http://localhost:9222/json`: PASS
+  - Selected `terminal` icon state: active
+  - Outer `.desktop-icon` computed frame: no border/background/box-shadow
+  - `.desktop-icon__emoji` computed frame: selected border/shadow present
+  - Geometry check: selected emoji box remained above the label text
+  - Screenshot: `/tmp/aionios-icon-selection-verify-selected.png`
+
 ## 2026-03-12 — Layout integrity and overlap QA pass
 
 ### Task Breakdown
