@@ -1,5 +1,5 @@
 export const EDITOR_WINDOW_SOURCE = `
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type HostFileEntry = {
   path: string;
@@ -57,6 +57,7 @@ function plainCodeHtml(value: string): string {
 }
 
 export default function WindowApp({ host, windowState }: WindowProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [files, setFiles] = useState<HostFileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState('');
   const [content, setContent] = useState('');
@@ -69,6 +70,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [highlighting, setHighlighting] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   const hasUnsavedChanges = useMemo(
     () => Boolean(selectedPath) && content !== savedContent,
@@ -202,6 +204,27 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     };
   }, [content, selectedPath]);
 
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const updateViewport = () => {
+      setViewport({
+        width: root.clientWidth,
+        height: root.clientHeight
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(() => {
+      updateViewport();
+    });
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   async function saveFile() {
     if (!selectedPath || saving || !hasUnsavedChanges) {
       return;
@@ -233,15 +256,21 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     }
   }
 
+  const isCompactLayout = viewport.width > 0 && viewport.width < 820;
+  const isVeryNarrow = viewport.width > 0 && viewport.width < 560;
+  const isShortLayout = viewport.height > 0 && viewport.height < 540;
+
   return (
     <div
+      ref={rootRef}
       data-editor-app
       style={{
         display: 'grid',
         gridTemplateRows: 'auto auto 1fr',
-        gap: 14,
+        gap: isCompactLayout ? 10 : 14,
         height: '100%',
-        padding: 14,
+        minHeight: 0,
+        padding: isCompactLayout ? 10 : 14,
         background:
           'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 30%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
         color: 'var(--shell-text, #f4e7c8)'
@@ -251,7 +280,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         style={{
           display: 'grid',
           gap: 6,
-          padding: '16px 18px',
+          padding: isCompactLayout ? '14px 16px' : '16px 18px',
           borderRadius: 24,
           border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
@@ -263,6 +292,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         <p
           style={{
             margin: 0,
+            display: isShortLayout ? 'none' : undefined,
             fontSize: 12,
             lineHeight: 1.6,
             color: 'var(--shell-muted, rgba(244,231,200,0.72))'
@@ -324,9 +354,9 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       <div
         style={{
           display: 'grid',
-          gap: 12,
+          gap: isCompactLayout ? 10 : 12,
           minHeight: 0,
-          gridTemplateRows: '1.1fr auto 1fr'
+          gridTemplateRows: isShortLayout ? 'minmax(140px, 1fr) auto minmax(120px, 0.9fr)' : '1.1fr auto 1fr'
         }}
       >
         <textarea
@@ -347,11 +377,19 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
             fontSize: 12,
             lineHeight: 1.6,
-            padding: 18,
+            padding: isCompactLayout ? 14 : 18,
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)'
           }}
         />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            alignItems: isVeryNarrow ? 'flex-start' : 'center',
+            flexDirection: isVeryNarrow ? 'column' : 'row',
+            flexWrap: 'wrap'
+          }}
+        >
           <button
             data-editor-save
             type="button"
@@ -409,7 +447,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             borderRadius: 24,
             border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background: 'linear-gradient(180deg, rgba(10,12,20,0.98), rgba(18,16,20,0.94))',
-            padding: 14,
+            padding: isCompactLayout ? 12 : 14,
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
           }}
           dangerouslySetInnerHTML={{ __html: previewHtml }}

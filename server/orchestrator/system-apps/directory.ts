@@ -1,5 +1,5 @@
 export const DIRECTORY_WINDOW_SOURCE = `
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 type FileEntry = {
   path: string;
@@ -164,6 +164,7 @@ function parseAppDescriptor(content: string): { appId: string; title: string; ic
 }
 
 export default function WindowApp({ host, windowState }: WindowProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [draftPath, setDraftPath] = useState('');
@@ -174,6 +175,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Loading files...');
   const [error, setError] = useState<string | null>(null);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   const loadFileList = useCallback(
     async (canCommit: () => boolean = () => true) => {
@@ -272,6 +274,8 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const selectedLabel = selectedPath ?? '(new file)';
   const canSave = !saving && !loadingList && draftPath.trim().length > 0;
   const hasUnsavedChanges = useMemo(() => draftContent !== savedContent, [draftContent, savedContent]);
+  const isCompactLayout = viewport.width > 0 && viewport.width < 860;
+  const isShortLayout = viewport.height > 0 && viewport.height < 520;
 
   const createNewFileDraft = useCallback((directory?: string) => {
     if (hasUnsavedChanges && !window.confirm('Discard unsaved changes?')) {
@@ -318,6 +322,27 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     };
   }, [createNewFileDraft, host.windowId]);
 
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const updateViewport = () => {
+      setViewport({
+        width: root.clientWidth,
+        height: root.clientHeight
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(() => {
+      updateViewport();
+    });
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   async function saveDraft() {
     const normalizedPath = normalizePath(draftPath);
     if (!normalizedPath) {
@@ -353,14 +378,15 @@ export default function WindowApp({ host, windowState }: WindowProps) {
 
   return (
     <div
+      ref={rootRef}
       data-directory-app
       style={{
         display: 'grid',
         gridTemplateRows: '1fr auto',
-        gap: 14,
+        gap: isCompactLayout ? 10 : 14,
         height: '100%',
         minHeight: 0,
-        padding: 14,
+        padding: isCompactLayout ? 10 : 14,
         background:
           'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 28%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
         color: 'var(--shell-text, #f4e7c8)'
@@ -389,8 +415,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(320px, 1.2fr) minmax(280px, 1fr)',
-          gap: 14,
+          gridTemplateColumns: isCompactLayout
+            ? 'minmax(0, 1fr)'
+            : 'minmax(280px, 1.1fr) minmax(260px, 1fr)',
+          gridTemplateRows: isCompactLayout ? 'minmax(180px, 0.95fr) minmax(220px, 1fr)' : undefined,
+          gap: isCompactLayout ? 10 : 14,
           minHeight: 0
         }}
       >
@@ -398,7 +427,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           data-directory-list
           style={{
             overflow: 'auto',
-            padding: 14,
+            padding: isCompactLayout ? 12 : 14,
             borderRadius: 28,
             border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background:
@@ -432,7 +461,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               <div
                 key={group.directory}
                 data-directory-group={group.directory}
-                style={{ display: 'grid', gap: 10, marginBottom: 18 }}
+                style={{ display: 'grid', gap: 10, marginBottom: isCompactLayout ? 14 : 18 }}
               >
                 <strong
                   style={{
@@ -486,9 +515,10 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         <section
           style={{
             display: 'grid',
-            gap: 12,
+            gridTemplateRows: 'auto auto minmax(0, 1fr)',
+            gap: isCompactLayout ? 10 : 12,
             minHeight: 0,
-            padding: 16,
+            padding: isCompactLayout ? 12 : 16,
             borderRadius: 28,
             border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background:
@@ -501,6 +531,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             <p
               style={{
                 margin: 0,
+                display: isShortLayout ? 'none' : undefined,
                 fontSize: 12,
                 lineHeight: 1.6,
                 color: 'var(--shell-muted, rgba(244,231,200,0.72))'
@@ -531,6 +562,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           <label
             style={{
               display: 'grid',
+              gridTemplateRows: 'auto minmax(0, 1fr)',
               gap: 6,
               fontSize: 11,
               letterSpacing: '0.12em',
@@ -546,14 +578,14 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               onChange={(event) => setDraftContent(event.target.value)}
               style={{
                 width: '100%',
-                flex: 1,
-                minHeight: 180,
+                height: '100%',
+                minHeight: 0,
                 borderRadius: 24,
                 border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
                 background: 'rgba(11,14,24,0.92)',
                 color: 'var(--shell-text-strong, #f1f7f2)',
-                padding: '16px 18px',
-                resize: 'vertical',
+                padding: isCompactLayout ? '14px 16px' : '16px 18px',
+                resize: isCompactLayout ? 'none' : 'vertical',
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: 12,
                 lineHeight: 1.6,
@@ -568,7 +600,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         style={{
           display: 'grid',
           gap: 8,
-          padding: '12px 14px',
+          padding: isCompactLayout ? '10px 12px' : '12px 14px',
           borderRadius: 24,
           border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background: 'rgba(10,13,22,0.82)'
@@ -582,7 +614,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             void saveDraft();
           }}
           style={{
-            justifySelf: 'start',
+            justifySelf: isCompactLayout ? 'stretch' : 'start',
             borderRadius: 999,
             border: '1px solid rgba(168,192,172,0.32)',
             padding: '10px 16px',
@@ -590,7 +622,8 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               ? 'linear-gradient(135deg, rgba(125,156,133,0.98), rgba(78,105,88,0.98))'
               : 'rgba(36,52,44,0.38)',
             color: '#f1f7f2',
-            cursor: canSave ? 'pointer' : 'default'
+            cursor: canSave ? 'pointer' : 'default',
+            textAlign: 'center'
           }}
         >
           {saving ? 'Saving...' : 'Save'}

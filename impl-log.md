@@ -1,5 +1,43 @@
 # Aionios Implementation Log
 
+## 2026-03-12 — Layout integrity and overlap QA pass
+
+### Task Breakdown
+
+1. Reproduce the user-reported overlap, clipping, and out-of-range layout regressions in the live app instead of relying on static review.
+2. Audit shell-level resize behavior so window chrome adapts to actual window bounds, not just viewport breakpoints.
+3. Audit built-in app layouts for narrow/short window behavior and patch the surfaces that assume roomy canvases.
+4. Re-run static validation after the layout fixes.
+5. Re-run real Chrome/CDP verification against both normal and cramped window sizes.
+
+### Progress
+
+- [x] Step 1 complete — ran browser-driven DOM sweeps and confirmed the main failure mode was narrow/short windows causing dense chrome and app content to exceed the visible area.
+- [x] Step 2 complete — added compact/cramped/short window states to the shell, raised the desktop resize floor, improved icon label wrapping, and made shared icon/taskbar surfaces more resilient.
+- [x] Step 3 complete — updated Directory, Editor, Media, and Recycle Bin to measure their live container size and switch to tighter layouts when space is constrained.
+- [x] Step 4 complete — `npm run check` passed after the layout fixes.
+- [x] Step 5 complete — Chrome/CDP verification passed at the current desktop minimum size with the previously failing Media surface and the other core apps fully visible inside their window bounds.
+
+### Notes
+
+- Browser pre-pass findings:
+  - Window chrome density was being reduced only by viewport media queries, which missed desktop windows resized below those thresholds.
+  - Directory and Editor could exceed their visible vertical space in shorter windows because their inner layouts still assumed generous content height.
+  - Fixed-size icon tiles and icon labels were contributing to narrow-panel stress.
+
+### Validation
+
+- `npm run check`: PASS
+  - `npm run lint`: PASS
+  - `npm run test`: PASS (24 files, 110 tests)
+  - `npm run typecheck`: PASS
+- Chrome CDP runtime verification: PASS
+  - Tested the core desktop windows at the current minimum size: `420x340`
+  - Media viewport: `418x277`; action row and player both remained fully visible with `0px` horizontal overflow
+  - Directory app area: `408x277`; main pane and footer stayed inside bounds with no right/bottom escape
+  - Editor app area: `384x253`; header and main body stayed inside bounds with `22px` right and `12px` bottom headroom
+  - Recycle Bin app area: `418x277`; list and footer remained fully visible with no out-of-bounds escape
+
 ## 2026-03-12 — Frontend redesign refinement from usability feedback
 
 ### Feedback Applied

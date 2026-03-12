@@ -1,5 +1,5 @@
 export const RECYCLE_BIN_WINDOW_SOURCE = `
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type RecycleBinItem = {
   id: string;
@@ -91,6 +91,7 @@ function resolveFileIcon(path: string) {
 }
 
 export default function WindowApp({ host, windowState }: WindowProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [items, setItems] = useState<RecycleBinItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -98,6 +99,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const [emptying, setEmptying] = useState(false);
   const [status, setStatus] = useState('Loading recycle bin...');
   const [error, setError] = useState<string | null>(null);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -180,6 +182,27 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     };
   }, [deleteItem, emptyBinImmediate, host.windowId, reload, restoreItem]);
 
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const updateViewport = () => {
+      setViewport({
+        width: root.clientWidth,
+        height: root.clientHeight
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(() => {
+      updateViewport();
+    });
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   async function restoreItem(id: string) {
     if (busyItemId || emptying) {
       return;
@@ -243,16 +266,19 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     }
   }
 
+  const isCompactLayout = viewport.width > 0 && viewport.width < 720;
+
   return (
     <div
+      ref={rootRef}
       data-recycle-bin-app
       style={{
         display: 'grid',
         gridTemplateRows: '1fr auto',
-        gap: 14,
+        gap: isCompactLayout ? 10 : 14,
         height: '100%',
         minHeight: 0,
-        padding: 14,
+        padding: isCompactLayout ? 10 : 14,
         background:
           'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 28%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
         color: 'var(--shell-text, #f4e7c8)'
@@ -263,7 +289,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         style={{
           overflow: 'auto',
           minHeight: 0,
-          padding: 14,
+          padding: isCompactLayout ? 12 : 14,
           borderRadius: 28,
           border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
@@ -321,7 +347,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         style={{
           display: 'grid',
           gap: 8,
-          padding: '12px 14px',
+          padding: isCompactLayout ? '10px 12px' : '12px 14px',
           borderRadius: 24,
           border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background: 'rgba(10,13,22,0.82)'

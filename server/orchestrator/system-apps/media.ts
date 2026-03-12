@@ -1,5 +1,5 @@
 export const MEDIA_WINDOW_SOURCE = `
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type HostFileEntry = {
   path: string;
@@ -103,6 +103,7 @@ function toSvgDataUrl(svgMarkup: string) {
 }
 
 export default function WindowApp({ host, windowState }: WindowProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const launchPath =
     windowState.launch && windowState.launch.kind === 'open-file'
       ? windowState.launch.path.trim()
@@ -113,6 +114,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   const [activeKind, setActiveKind] = useState<MediaKind | null>(null);
   const [status, setStatus] = useState('Loading host files...');
   const [autoOpenedLaunch, setAutoOpenedLaunch] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     let active = true;
@@ -156,6 +158,27 @@ export default function WindowApp({ host, windowState }: WindowProps) {
     setAutoOpenedLaunch(true);
     void loadSource();
   }, [autoOpenedLaunch, launchPath]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const updateViewport = () => {
+      setViewport({
+        width: root.clientWidth,
+        height: root.clientHeight
+      });
+    };
+    updateViewport();
+    const observer = new ResizeObserver(() => {
+      updateViewport();
+    });
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
 
   async function loadSource() {
     const requestedSource = sourceInput.trim();
@@ -211,16 +234,21 @@ export default function WindowApp({ host, windowState }: WindowProps) {
   }
 
   const canWallpaper = activeKind === 'image' || activeKind === 'video';
+  const isCompactLayout = viewport.width > 0 && viewport.width < 760;
+  const isVeryNarrow = viewport.width > 0 && viewport.width < 560;
+  const isShortLayout = viewport.height > 0 && viewport.height < 460;
 
   return (
     <div
+      ref={rootRef}
       data-media-app
       style={{
         display: 'grid',
-        gridTemplateRows: 'auto auto auto 1fr',
-        gap: 14,
+        gridTemplateRows: isShortLayout ? 'auto auto 1fr' : 'auto auto auto 1fr',
+        gap: isCompactLayout ? 8 : 14,
         height: '100%',
-        padding: 14,
+        minHeight: 0,
+        padding: isCompactLayout ? 8 : 14,
         background:
           'radial-gradient(circle at top, rgba(188,145,76,0.12), transparent 30%), linear-gradient(180deg, rgba(8,10,17,0.92), rgba(12,15,24,0.96))',
         color: 'var(--shell-text, #f4e7c8)'
@@ -230,7 +258,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
         style={{
           display: 'grid',
           gap: 6,
-          padding: '16px 18px',
+          padding: isShortLayout ? '12px 14px' : isCompactLayout ? '14px 16px' : '16px 18px',
           borderRadius: 24,
           border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
           background:
@@ -240,17 +268,24 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       >
         <strong style={{ fontSize: 18, letterSpacing: '0.04em' }}>{windowState.title}</strong>
         <p
-          style={{
-            margin: 0,
-            fontSize: 12,
-            lineHeight: 1.6,
+        style={{
+          margin: 0,
+          display: isShortLayout ? 'none' : undefined,
+          fontSize: 12,
+          lineHeight: 1.6,
             color: 'var(--shell-muted, rgba(244,231,200,0.72))'
           }}
         >
           Load host media or paste a direct URL, then project it onto the shell wallpaper when needed.
         </p>
       </header>
-      <div style={{ display: 'flex', gap: 10 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) auto',
+          gap: 10
+        }}
+      >
         <input
           data-media-source
           list="media-source-options"
@@ -258,7 +293,6 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           onChange={(event) => setSourceInput(event.target.value)}
           placeholder="e.g. /photos/cat.jpg or https://example.com/song.mp3"
           style={{
-            flex: 1,
             borderRadius: 18,
             border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
             background: 'rgba(17,20,31,0.86)',
@@ -283,7 +317,8 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             fontSize: 11,
-            fontWeight: 700
+            fontWeight: 700,
+            width: isCompactLayout ? '100%' : undefined
           }}
         >
           Load
@@ -303,7 +338,14 @@ export default function WindowApp({ host, windowState }: WindowProps) {
       >
         {mediaFiles.length > 0 ? 'Host media files: ' + mediaFiles.join(', ') : 'No host media files detected.'}
       </p>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isVeryNarrow ? 'repeat(2, minmax(0, 1fr))' : undefined,
+          gap: isShortLayout ? 6 : 8,
+          minWidth: 0
+        }}
+      >
         <button
           type="button"
           data-media-set-wallpaper
@@ -318,13 +360,14 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           style={{
             borderRadius: 999,
             border: '1px solid rgba(152,199,164,0.3)',
-            padding: '10px 16px',
+            padding: isShortLayout ? '9px 12px' : '10px 16px',
             background:
               canWallpaper && activeSource
                 ? 'linear-gradient(135deg, rgba(60,119,79,0.96), rgba(31,82,54,0.96))'
                 : 'rgba(62,50,32,0.38)',
             color: '#f1f7f2',
-            cursor: canWallpaper && activeSource ? 'pointer' : 'not-allowed'
+            cursor: canWallpaper && activeSource ? 'pointer' : 'not-allowed',
+            width: '100%'
           }}
         >
           Set as Wallpaper
@@ -338,10 +381,11 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           style={{
             borderRadius: 999,
             border: '1px solid var(--shell-border, rgba(168,192,172,0.24))',
-            padding: '10px 16px',
+            padding: isShortLayout ? '9px 12px' : '10px 16px',
             background: 'rgba(15,18,29,0.6)',
             color: 'var(--shell-text, #d9e6dd)',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            width: '100%'
           }}
         >
           Clear Wallpaper
@@ -358,7 +402,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 18,
+          padding: isShortLayout ? 10 : isCompactLayout ? 12 : 18,
           overflow: 'auto',
           boxShadow: '0 24px 50px rgba(3,5,10,0.32)'
         }}
@@ -384,6 +428,7 @@ export default function WindowApp({ host, windowState }: WindowProps) {
             controls
             style={{
               width: '100%',
+              minWidth: 0,
               maxHeight: '100%',
               borderRadius: 22,
               boxShadow: '0 26px 70px rgba(0,0,0,0.34)'
@@ -396,7 +441,8 @@ export default function WindowApp({ host, windowState }: WindowProps) {
               margin: 0,
               fontSize: 12,
               color: 'var(--shell-muted, rgba(244,231,200,0.72))',
-              textAlign: 'center'
+              textAlign: 'center',
+              maxWidth: isVeryNarrow ? '24ch' : '34ch'
             }}
           >
             {status}

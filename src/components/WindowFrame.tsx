@@ -2,8 +2,8 @@ import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useRef } from 'react';
 import type { DesktopWindow, WindowBounds } from '../types';
 
-const MIN_WINDOW_WIDTH = 360;
-const MIN_WINDOW_HEIGHT = 240;
+const MIN_WINDOW_WIDTH = 420;
+const MIN_WINDOW_HEIGHT = 340;
 
 type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
@@ -53,6 +53,11 @@ export function WindowFrame({
   children
 }: WindowFrameProps) {
   const frameRef = useRef<HTMLElement | null>(null);
+  const isCompactWindow =
+    !mobileMode && !windowItem.maximized && (windowItem.width <= 560 || windowItem.height <= 420);
+  const isCrampedWindow =
+    !mobileMode && !windowItem.maximized && (windowItem.width <= 460 || windowItem.height <= 340);
+  const isShortWindow = !mobileMode && !windowItem.maximized && windowItem.height <= 420;
 
   const startInteraction = (
     event: ReactPointerEvent<HTMLElement>,
@@ -181,6 +186,10 @@ export function WindowFrame({
         windowItem.maximized ? 'window-frame--maximized' : ''
       } ${mobileMode ? 'window-frame--mobile' : ''}${
         mobileMode && focused ? ' window-frame--mobile-focused' : ''
+      }${isCompactWindow ? ' window-frame--compact' : ''}${
+        isCrampedWindow ? ' window-frame--cramped' : ''
+      }${isShortWindow ? ' window-frame--short' : ''}${
+        mobileMode ? ' window-frame--short' : ''
       }`}
       style={frameStyle}
       data-session-id={windowItem.sessionId}
